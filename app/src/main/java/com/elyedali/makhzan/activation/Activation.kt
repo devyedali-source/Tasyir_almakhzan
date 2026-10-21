@@ -11,6 +11,8 @@ import com.elyedali.makhzan.data.ShopDao
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.AggregateSource
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 import java.util.Calendar
 
@@ -165,6 +167,7 @@ object Activation {
                     "expiresAt" to newExp,
                     "updatedAt" to FieldValue.serverTimestamp(),
                 ),
+                SetOptions.merge(),
             )
             newExp
         }.await()
@@ -198,6 +201,7 @@ object Activation {
                     "lastPurchaseToken" to purchaseToken,
                     "source" to "play",
                 ),
+                SetOptions.merge(),
             )
             newExp
         }.await()
@@ -208,5 +212,60 @@ object Activation {
         val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
         val codes = listOfNotNull(tm?.simCountryIso, tm?.networkCountryIso, Locale.getDefault().country)
         return codes.any { it.equals("mr", ignoreCase = true) }
+    }
+
+    // ---------------- تسجيل المستخدمين والمحلات (لإحصائيات لوحة المدير) ----------------
+
+    /** يسجّل المحل على الخادم مرة واحدة عند إنشائه (يُرسل لاحقًا تلقائيًا إن لم يتوفر الإنترنت) */
+    fun registerShop(shop: Shop) {
+        val user = Auth.auth.currentUser ?: return
+        if (shop.remoteId.isBlank()) return
+        doc(shop.remoteId).set(
+            mapOf(
+                "ownerUid" to user.uid,
+                "ownerEmail" to (user.email ?: ""),
+                "shopName" to shop.name,
+                "tier" to 0,
+                "expiresAt" to 0L,
+                "createdAt" to FieldValue.serverTimestamp(),
+            )
+        )
+    }
+
+    /** يسجّل المستخدم مرة واحدة بعد أول دخول */
+    fun registerUser() {
+        val user = Auth.auth.currentUser ?: return
+        FirebaseFirestore.getInstance().collection("users").document(user.uid).set(
+            mapOf("email" to (user.email ?: ""), "createdAt" to FieldValue.serverTimestamp())
+        )
+    }
+
+    data class AdminStats(
+        val users: Long,
+        val shops: Long,
+        val active: Long,
+        val expiringSoon: Long,
+        val neverActivated: Long,
+        val tier1: Long,
+        val tier2: Long,
+        val tier3: Long,
+    )
+
+    /** إحصائيات المدير بعمليات عدّ فقط (قراءة واحدة لكل ألف وثيقة تقريبًا، دون تحميل البيانات) */
+    suspend fun adminStats(): AdminStats {
+        val db = FirebaseFirestore.getInstance()
+        val shops = db.collection("shops")
+        val now = System.currentTimeMillis()
+        suspend fun count(q: com.google.firebase.firestore.Query) = q.count().get(AggregateSource.SERVER).await().count
+        return AdminStats(
+            users = count(db.collection("users")),
+            shops = count(shops),
+            active = count(shops.whereGreaterThan("expiresAt", now)),
+            expiringSoon = count(shops.whereGreaterThan("expiresAt", now).whereLessThan("expiresAt", now + 7 * 86_400_000L)),
+            neverActivated = count(shops.whereEqualTo("tier", 0)),
+            tier1 = count(shops.whereEqualTo("tier", 1)),
+            tier2 = count(shops.whereEqualTo("tier", 2)),
+            tier3 = count(shops.whereEqualTo("tier", 3)),
+        )
     }
 }

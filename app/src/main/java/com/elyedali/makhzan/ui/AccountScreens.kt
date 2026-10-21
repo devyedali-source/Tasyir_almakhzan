@@ -158,15 +158,6 @@ fun AccountDialog(onDismiss: () -> Unit, onEnableDrive: () -> Unit, onAdminLink:
                 if (Prefs.driveNeedsConsent(activity)) {
                     OutlinedButton(onClick = onEnableDrive) { Text(tr("تفعيل الحفظ على Drive")) }
                 }
-                if (Auth.isAdmin()) {
-                    // للمسؤول: إذا لم يفتح الرابط التطبيقَ مباشرة، ينسخ رسالة واتساب ثم يضغط هنا
-                    OutlinedButton(onClick = {
-                        val text = clipboard.getText()?.text.orEmpty()
-                        val url = Regex("https://stockcaisse\\.web\\.app/activate\\S+").find(text)?.value
-                        val req = url?.let { Activation.parse(Uri.parse(it)) }
-                        if (req != null) onAdminLink(req) else message = tr("انسخ رسالة طلب التفعيل أولًا ثم أعد المحاولة")
-                    }) { Text(tr("تفعيل من رابط منسوخ")) }
-                }
                 if (busy) CircularProgressIndicator()
                 message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }

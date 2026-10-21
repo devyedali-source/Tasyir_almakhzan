@@ -18,6 +18,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AdminPanelSettings
+import com.elyedali.makhzan.auth.Auth
+import com.elyedali.makhzan.activation.Activation
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Language
@@ -57,6 +60,7 @@ fun ShopsScreen(
     driveOk: Boolean,
     requestDrive: () -> Unit,
     onAdminLink: (ActivationRequest) -> Unit,
+    onAdminPanel: () -> Unit,
 ) {
     val shops by dao.shops().collectAsState(initial = emptyList())
     var showAdd by remember { mutableStateOf(false) }
@@ -68,6 +72,11 @@ fun ShopsScreen(
     Scaffold(
         topBar = {
             AppTopBar(tr("محلاتي التجارية"), actions = {
+                if (Auth.isAdmin()) {
+                    IconButton(onClick = onAdminPanel) {
+                        Icon(Icons.Default.AdminPanelSettings, contentDescription = tr("لوحة المدير"))
+                    }
+                }
                 IconButton(onClick = { showLang = true }) { Icon(Icons.Default.Language, contentDescription = tr("لغة التطبيق")) }
                 IconButton(onClick = { showAccount = true }) { Icon(Icons.Default.AccountCircle, contentDescription = tr("حسابي")) }
             })
@@ -151,9 +160,9 @@ fun ShopsScreen(
             onConfirm = { name ->
                 showAdd = false
                 scope.launch {
-                    dao.insertShop(
-                        Shop(name = name, createdAt = System.currentTimeMillis(), remoteId = UUID.randomUUID().toString())
-                    )
+                    val newShop = Shop(name = name, createdAt = System.currentTimeMillis(), remoteId = UUID.randomUUID().toString())
+                    val id = dao.insertShop(newShop)
+                    Activation.registerShop(newShop.copy(id = id))
                 }
             },
         )

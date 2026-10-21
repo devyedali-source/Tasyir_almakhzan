@@ -56,6 +56,8 @@ import com.elyedali.makhzan.data.ShopDao
 import com.elyedali.makhzan.i18n.I18n
 import com.elyedali.makhzan.i18n.tr
 import com.elyedali.makhzan.ui.AdminActivateScreen
+import com.elyedali.makhzan.ui.AdminPanelScreen
+import kotlinx.coroutines.flow.first
 import com.elyedali.makhzan.ui.CashScreen
 import com.elyedali.makhzan.ui.InvoiceScreen
 import com.elyedali.makhzan.ui.LoginScreen
@@ -82,6 +84,7 @@ sealed interface Route {
     /** opId = null: فاتورة تجريبية لمعاينة التصميم */
     data class Invoice(val shopId: Long, val opId: Long?) : Route
     data class AdminActivate(val req: ActivationRequest) : Route
+    data object AdminPanel : Route
 }
 
 private fun Route.shopId(): Long? = when (this) {
@@ -336,6 +339,17 @@ private fun AppRoot(
     // المحل المجاني الوحيد لهذا الحساب
     LaunchedEffect(Unit) { dao.firstShopId().collect { Plans.freeShopId = it } }
 
+    // تسجيل المستخدم ومحلاته على الخادم مرة واحدة (للإحصائيات فقط، دون أي بيانات بيع أو مخزون)
+    val ctx = LocalContext.current
+    LaunchedEffect(Unit) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@LaunchedEffect
+        if (!Prefs.registered(ctx, uid)) {
+            Activation.registerUser()
+            dao.shops().first().forEach { Activation.registerShop(it) }
+            Prefs.setRegistered(ctx, uid)
+        }
+    }
+
     // عملة المحل المفتوح
     val currentShop = stack.lastOrNull { it.shopId() != null }?.shopId()
     LaunchedEffect(currentShop) {
@@ -346,6 +360,7 @@ private fun AppRoot(
         Route.Shops -> ShopsScreen(
             dao, onOpen = { go(Route.Home(it)) }, driveOk = driveOk, requestDrive = requestDrive,
             onAdminLink = { go(Route.AdminActivate(it)) },
+            onAdminPanel = { go(Route.AdminPanel) },
         )
         is Route.Home -> ShopHomeScreen(dao, r.shopId, onBack = ::back, go = ::go)
         is Route.Sale -> SaleScreen(dao, r.shopId, onBack = ::back, onInvoice = { go(Route.Invoice(r.shopId, it)) })
@@ -356,6 +371,7 @@ private fun AppRoot(
         is Route.Settings -> SettingsScreen(dao, r.shopId, onBack = ::back, onPreview = { go(Route.Invoice(r.shopId, null)) })
         is Route.Invoice -> InvoiceScreen(dao, r.shopId, r.opId, onBack = ::back)
         is Route.AdminActivate -> AdminActivateScreen(r.req, onBack = ::back)
+        Route.AdminPanel -> AdminPanelScreen(onBack = ::back, onActivate = { go(Route.AdminActivate(it)) })
     }
 }
 

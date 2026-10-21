@@ -21,6 +21,9 @@ object Prefs {
     fun driveNeedsConsent(c: Context) = sp(c).getBoolean("drive_needs_consent", false)
     fun setDriveNeedsConsent(c: Context, v: Boolean) = sp(c).edit().putBoolean("drive_needs_consent", v).commit()
 
+    fun registered(c: Context, uid: String) = sp(c).getBoolean("registered_$uid", false)
+    fun setRegistered(c: Context, uid: String) = sp(c).edit().putBoolean("registered_$uid", true).commit()
+
     fun language(c: Context): String? = sp(c).getString("ui_language", null)
     fun setLanguage(c: Context, v: String) = sp(c).edit().putString("ui_language", v).commit()
 

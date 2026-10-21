@@ -24,14 +24,34 @@ service cloud.firestore {
         && d.lastPurchaseToken is string
         && d.lastPurchaseToken.size() > 20
         && (resource == null || resource.data.get("lastPurchaseToken", "") != d.lastPurchaseToken)
-        && d.keys().hasOnly(["ownerUid", "ownerEmail", "shopName", "tier", "expiresAt", "updatedAt", "lastPurchaseToken", "source"]);
+        && d.keys().hasOnly(["ownerUid", "ownerEmail", "shopName", "tier", "expiresAt", "updatedAt", "createdAt", "lastPurchaseToken", "source"]);
+    }
+
+    // تسجيل محل جديد غير مفعّل (للإحصائيات): مرة واحدة، بلا أي تفعيل
+    function ownerRegisterShop() {
+      let d = request.resource.data;
+      return request.auth != null
+        && d.ownerUid == request.auth.uid
+        && d.tier == 0
+        && d.expiresAt == 0
+        && d.keys().hasOnly(["ownerUid", "ownerEmail", "shopName", "tier", "expiresAt", "createdAt"]);
     }
 
     // وثيقة تفعيل لكل محل: يقرؤها صاحبها فقط
     match /shops/{shopId} {
-      allow read: if request.auth != null
+      allow get: if request.auth != null
         && (resource == null || resource.data.ownerUid == request.auth.uid || isAdmin());
-      allow write: if isAdmin() || ownerPlayPurchase();
+      allow list: if isAdmin();
+      allow create: if isAdmin() || ownerPlayPurchase() || ownerRegisterShop();
+      allow update: if isAdmin() || ownerPlayPurchase();
+      allow delete: if isAdmin();
+    }
+
+    // المستخدمون (بريد وتاريخ التسجيل فقط) لعدّهم في لوحة المدير
+    match /users/{uid} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(["email", "createdAt"]);
     }
 
     // كل ما عدا ذلك ممنوع

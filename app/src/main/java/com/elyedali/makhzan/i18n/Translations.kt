@@ -3,6 +3,21 @@ package com.elyedali.makhzan.i18n
 /** قواميس الترجمة: المفتاح هو النص العربي كما هو في الواجهة */
 internal object Translations {
     val fr: Map<String, String> = hashMapOf(
+        "لوحة المدير" to "Tableau d'administration",
+        "تحديث" to "Actualiser",
+        "تعذر جلب الإحصائيات: %1\$s" to "Impossible de charger les statistiques : %1\$s",
+        "هذه الصفحة خاصة بمدير التطبيق." to "Cette page est réservée à l'administrateur.",
+        "المستخدمون والمحلات" to "Utilisateurs et boutiques",
+        "المستخدمون" to "Utilisateurs",
+        "المحلات" to "Boutiques",
+        "التفعيل" to "Activation",
+        "مفعّلة الآن" to "Actives",
+        "تنتهي خلال أسبوع" to "Expirent sous 7 jours",
+        "لم تُفعَّل أبدًا" to "Jamais activées",
+        "آخر باقة لكل محل (منذ البداية)" to "Dernière formule par boutique (depuis le début)",
+        "400 أوقية" to "400 MRU",
+        "600 أوقية" to "600 MRU",
+        "900 أوقية" to "900 MRU",
         "الدفع بالبطاقة البنكية — %1\$s" to "Payer par carte bancaire — %1\$s",
         "الدفع بالبطاقة البنكية" to "Payer par carte bancaire",
         "الدفع عبر واتساب" to "Payer via WhatsApp",
@@ -222,6 +237,21 @@ internal object Translations {
     )
 
     val en: Map<String, String> = hashMapOf(
+        "لوحة المدير" to "Admin panel",
+        "تحديث" to "Refresh",
+        "تعذر جلب الإحصائيات: %1\$s" to "Could not load statistics: %1\$s",
+        "هذه الصفحة خاصة بمدير التطبيق." to "This page is for the app administrator only.",
+        "المستخدمون والمحلات" to "Users and shops",
+        "المستخدمون" to "Users",
+        "المحلات" to "Shops",
+        "التفعيل" to "Activation",
+        "مفعّلة الآن" to "Active now",
+        "تنتهي خلال أسبوع" to "Expiring within a week",
+        "لم تُفعَّل أبدًا" to "Never activated",
+        "آخر باقة لكل محل (منذ البداية)" to "Latest plan per shop (all time)",
+        "400 أوقية" to "400 MRU",
+        "600 أوقية" to "600 MRU",
+        "900 أوقية" to "900 MRU",
         "الدفع بالبطاقة البنكية — %1\$s" to "Pay by card — %1\$s",
         "الدفع بالبطاقة البنكية" to "Pay by card",
         "الدفع عبر واتساب" to "Pay via WhatsApp",
