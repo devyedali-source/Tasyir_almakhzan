@@ -14,8 +14,8 @@ android {
         applicationId = "com.elyedali.makhzan"
         minSdk = 24
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3"
+        versionCode = 4
+        versionName = "0.4"
     }
 
     // مفتاح التوقيع الثابت: يأتي من أسرار GitHub (KEYSTORE_BASE64 و KEYSTORE_PASSWORD)

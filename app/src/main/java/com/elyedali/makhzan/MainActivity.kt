@@ -5,11 +5,14 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -100,15 +105,23 @@ private val AppColors = lightColorScheme(
     surface = Color(0xFFFFFFFF),
 )
 
+private val AppShapes = Shapes(
+    small = RoundedCornerShape(10.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(22.dp),
+)
+
 class MainActivity : ComponentActivity() {
     private var deepLink by mutableStateOf<Uri?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // شريط الحالة شفاف بأيقونات فاتحة فوق الشريط الأخضر (إلزامي مع أندرويد 15)
+        enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
         super.onCreate(savedInstanceState)
         deepLink = intent?.data
         val dao = AppDatabase.get(this).dao()
         setContent {
-            MaterialTheme(colorScheme = AppColors) {
+            MaterialTheme(colorScheme = AppColors, shapes = AppShapes) {
                 val dir = if (I18n.isRtl) LayoutDirection.Rtl else LayoutDirection.Ltr
                 CompositionLocalProvider(LocalLayoutDirection provides dir) {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -236,11 +249,15 @@ private fun DriveSetup(
     }
 
     when (val p = phase) {
-        Phase.Checking, Phase.Restoring -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Phase.Checking, Phase.Restoring -> Box(
+            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primary),
+            contentAlignment = Alignment.Center,
+        ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = Color.White)
                 Text(
-                    if (p == Phase.Restoring) tr("جارٍ استرجاع بياناتك من Google Drive…")
+                    color = Color.White,
+                    text = if (p == Phase.Restoring) tr("جارٍ استرجاع بياناتك من Google Drive…")
                     else tr("جارٍ التحقق من النسخة الاحتياطية على Google Drive…"),
                     textAlign = TextAlign.Center, modifier = Modifier.padding(24.dp),
                 )

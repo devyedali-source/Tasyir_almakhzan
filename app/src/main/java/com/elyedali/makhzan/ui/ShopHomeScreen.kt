@@ -1,6 +1,13 @@
 package com.elyedali.makhzan.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -84,55 +91,64 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // بطاقة الرصيد
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(tr("رصيد الصندوق"), style = MaterialTheme.typography.titleSmall)
+                Column(Modifier.padding(20.dp)) {
+                    Text(tr("رصيد الصندوق"), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
                     Text(
                         Money.format(balance),
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
-                        color = if (balance < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = if (balance < 0) Color(0xFFFFCDD2) else Color.White,
                     )
-                    Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column {
-                            Text(tr("مبيعات اليوم"), style = MaterialTheme.typography.bodySmall)
-                            Text(Money.format(salesToday), fontWeight = FontWeight.SemiBold)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(tr("ربح اليوم"), style = MaterialTheme.typography.bodySmall)
-                            Text(Money.format(profitToday), fontWeight = FontWeight.SemiBold)
-                        }
+                    Spacer(Modifier.height(14.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        MiniStat(tr("مبيعات اليوم"), Money.format(salesToday), Modifier.weight(1f))
+                        MiniStat(tr("ربح اليوم"), Money.format(profitToday), Modifier.weight(1f))
                     }
                 }
             }
 
+            // حالة الباقة
             shop?.let {
                 val locked = Plans.isLocked(it, count, now)
+                val soon = Plans.daysLeftIfSoon(it, now)
+                val (bg, fg) = when {
+                    locked -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.error
+                    soon != null -> Color(0xFFFFF3CD) to Color(0xFF8A5A00)
+                    else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+                }
                 Card(
                     onClick = { showActivation = true },
+                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (locked) MaterialTheme.colorScheme.errorContainer
-                        else MaterialTheme.colorScheme.surfaceVariant
-                    ),
+                    colors = CardDefaults.cardColors(containerColor = bg),
                 ) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            if (locked) Icons.Default.Lock else Icons.Default.Verified,
+                            contentDescription = null, tint = fg,
+                        )
+                        Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(tr("المنتجات: %1\$s من %2\$s", count, Plans.limitText(it, now)), fontWeight = FontWeight.SemiBold)
-                            Text(Plans.label(it, now), style = MaterialTheme.typography.bodySmall)
-                            if (locked) {
-                                Text(
-                                    tr("انتهى التفعيل: البيع والشراء متوقفان حتى التجديد. بياناتك محفوظة كاملة."),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error,
-                                )
-                            }
+                            Text(
+                                tr("المنتجات: %1\$s من %2\$s", count, Plans.limitText(it, now)),
+                                fontWeight = FontWeight.SemiBold, color = fg,
+                            )
+                            Text(
+                                when {
+                                    locked -> tr("انتهى التفعيل: البيع والشراء متوقفان حتى التجديد. بياناتك محفوظة كاملة.")
+                                    soon != null -> tr("ينتهي التفعيل بعد %1\$s يوم", soon)
+                                    else -> Plans.label(it, now)
+                                },
+                                style = MaterialTheme.typography.bodySmall, color = fg,
+                            )
                         }
                         Text(
                             if (Plans.isActive(it, now)) tr("تجديد / ترقية") else tr("تفعيل"),
@@ -142,29 +158,30 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
                 }
             }
 
+            // العمليات الرئيسية
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ActionTile(tr("بيع"), Icons.Default.PointOfSale, Color(0xFF0B6E4F), Modifier.weight(1f)) {
+                BigAction(tr("بيع"), Icons.Default.QrCodeScanner, Color(0xFF0B6E4F), Modifier.weight(1f)) {
                     if (shop?.let { Plans.isLocked(it, count, System.currentTimeMillis()) } == true) showActivation = true
                     else go(Route.Sale(shopId))
                 }
-                ActionTile(tr("شراء (إدخال بضاعة)"), Icons.Default.AddShoppingCart, Color(0xFF1565C0), Modifier.weight(1f)) {
+                BigAction(tr("شراء"), Icons.Default.AddShoppingCart, Color(0xFF1565C0), Modifier.weight(1f)) {
                     if (shop?.let { Plans.isLocked(it, count, System.currentTimeMillis()) } == true) showActivation = true
                     else go(Route.Purchase(shopId))
                 }
             }
+
+            // باقي الأقسام
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ActionTile(tr("مصاريف"), Icons.Default.MoneyOff, Color(0xFFC62828), Modifier.weight(1f)) {
-                    showExpense = true
-                }
-                ActionTile(tr("الصندوق"), Icons.Default.AccountBalanceWallet, Color(0xFF8A5A00), Modifier.weight(1f)) {
+                SmallAction(tr("مصروف"), Icons.Default.MoneyOff, Color(0xFFC62828), Modifier.weight(1f)) { showExpense = true }
+                SmallAction(tr("الصندوق"), Icons.Default.AccountBalanceWallet, Color(0xFF8A5A00), Modifier.weight(1f)) {
                     go(Route.Cash(shopId))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ActionTile(tr("المخزون"), Icons.Default.Inventory2, Color(0xFF6A1B9A), Modifier.weight(1f)) {
+                SmallAction(tr("المخزون"), Icons.Default.Inventory2, Color(0xFF6A1B9A), Modifier.weight(1f)) {
                     go(Route.Stock(shopId))
                 }
-                ActionTile(tr("الإعدادات والفواتير"), Icons.Default.Settings, Color(0xFF455A64), Modifier.weight(1f)) {
+                SmallAction(tr("الإعدادات"), Icons.Default.Settings, Color(0xFF455A64), Modifier.weight(1f)) {
                     go(Route.Settings(shopId))
                 }
             }
@@ -196,20 +213,56 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
 }
 
 @Composable
-private fun ActionTile(label: String, icon: ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) {
+private fun MiniStat(label: String, value: String, modifier: Modifier) {
+    Column(
+        modifier
+            .background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Text(label, color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
+        Text(value, color = Color.White, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+@Composable
+private fun BigAction(label: String, icon: ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) {
     Card(
         onClick = onClick,
-        modifier = modifier.height(110.dp),
+        shape = RoundedCornerShape(22.dp),
+        modifier = modifier.height(128.dp),
         colors = CardDefaults.cardColors(containerColor = color),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
         Column(
-            Modifier.fillMaxSize().padding(8.dp),
+            Modifier.fillMaxSize().padding(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(36.dp))
-            Spacer(Modifier.height(6.dp))
-            Text(label, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(44.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(label, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+        }
+    }
+}
+
+@Composable
+private fun SmallAction(label: String, icon: ImageVector, color: Color, modifier: Modifier, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        modifier = modifier.height(76.dp),
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.10f)),
+    ) {
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier.size(40.dp).background(color, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center,
+            ) { Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp)) }
+            Spacer(Modifier.width(10.dp))
+            Text(label, fontWeight = FontWeight.SemiBold, color = color, textAlign = TextAlign.Start)
         }
     }
 }

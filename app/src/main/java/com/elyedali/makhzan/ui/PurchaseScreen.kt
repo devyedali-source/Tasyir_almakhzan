@@ -1,12 +1,15 @@
 package com.elyedali.makhzan.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -63,6 +66,10 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
     var activationShop by remember { mutableStateOf<Shop?>(null) }
     var activationCount by remember { mutableStateOf(0) }
 
+    var confirmLeave by remember { mutableStateOf(false) }
+    fun tryBack() { if (cart.isNotEmpty()) confirmLeave = true else onBack() }
+    BackHandler(enabled = cart.isNotEmpty()) { confirmLeave = true }
+
     fun toast(msg: String) {
         scope.launch {
             snackbar.currentSnackbarData?.dismiss()
@@ -104,12 +111,12 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
     val total = cart.sumOf { it.buyPrice * it.qty }
 
     Scaffold(
-        topBar = { AppTopBar(tr("شراء (إدخال بضاعة)"), onBack) },
+        topBar = { AppTopBar(tr("شراء"), ::tryBack) },
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             Surface(tonalElevation = 6.dp, shadowElevation = 6.dp) {
                 Row(
-                    Modifier.fillMaxWidth().padding(16.dp),
+                    Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
@@ -122,6 +129,8 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                     }
                     Button(
                         enabled = cart.isNotEmpty() && !busy,
+                        modifier = Modifier.height(54.dp),
+                        shape = RoundedCornerShape(16.dp),
                         onClick = {
                             busy = true
                             val items = cart.toList()
@@ -137,7 +146,7 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                                 }
                             }
                         },
-                    ) { Text(tr("تأكيد الشراء")) }
+                    ) { Text(tr("تأكيد الشراء"), style = MaterialTheme.typography.titleMedium) }
                 }
             }
         },
@@ -224,6 +233,20 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
     }
     activationShop?.let { sh ->
         ActivationDialog(dao, sh, activationCount, onDismiss = { activationShop = null })
+    }
+
+    if (confirmLeave) {
+        AlertDialog(
+            onDismissRequest = { confirmLeave = false },
+            title = { Text(tr("الخروج دون تأكيد؟")) },
+            text = { Text(tr("في السلة منتجات لم تُؤكَّد بعد. إذا خرجت ستُلغى.")) },
+            confirmButton = {
+                TextButton(onClick = { confirmLeave = false; onBack() }) {
+                    Text(tr("خروج"), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmLeave = false }) { Text(tr("البقاء")) } },
+        )
     }
 }
 

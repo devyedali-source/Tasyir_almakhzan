@@ -1,6 +1,7 @@
 package com.elyedali.makhzan.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -47,8 +48,13 @@ private val OutColor = Color(0xFFC62828)
 
 @Composable
 fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long) -> Unit) {
-    var todayOnly by remember { mutableStateOf(true) }
-    val from = if (todayOnly) Dates.startOfToday() else 0L
+    // 0 = اليوم، 1 = هذا الشهر، 2 = الكل
+    var period by remember { mutableStateOf(0) }
+    val from = when (period) {
+        0 -> Dates.startOfToday()
+        1 -> Dates.startOfMonth()
+        else -> 0L
+    }
 
     val balance by dao.balance(shopId).collectAsState(initial = 0L)
     val sales by remember(from) { dao.sumType(shopId, OpType.SALE, from) }.collectAsState(initial = 0L)
@@ -66,33 +72,39 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
         ) {
             item {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(tr("الرصيد الحالي للصندوق"), style = MaterialTheme.typography.titleSmall)
+                    Column(Modifier.padding(20.dp)) {
+                        Text(tr("رصيد الصندوق"), color = Color.White.copy(alpha = 0.85f))
                         Text(
-                            Money.format(balance), style = MaterialTheme.typography.headlineMedium,
+                            Money.format(balance), style = MaterialTheme.typography.headlineLarge,
                             fontWeight = FontWeight.Bold,
-                            color = if (balance < 0) OutColor else MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = if (balance < 0) Color(0xFFFFCDD2) else Color.White,
                         )
                     }
                 }
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = todayOnly, onClick = { todayOnly = true }, label = { Text(tr("اليوم")) })
-                    FilterChip(selected = !todayOnly, onClick = { todayOnly = false }, label = { Text(tr("كل الفترات")) })
+                    FilterChip(selected = period == 0, onClick = { period = 0 }, label = { Text(tr("اليوم")) })
+                    FilterChip(selected = period == 1, onClick = { period = 1 }, label = { Text(tr("هذا الشهر")) })
+                    FilterChip(selected = period == 2, onClick = { period = 2 }, label = { Text(tr("الكل")) })
                 }
             }
             item {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SummaryRow(tr("المبيعات"), sales, InColor)
-                        SummaryRow(tr("المشتريات"), purchases, OutColor)
-                        SummaryRow(tr("المصاريف"), expenses, OutColor)
-                        SummaryRow(tr("الربح من المبيعات"), profit, InColor)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatTile(tr("المبيعات"), sales, InColor, Modifier.weight(1f))
+                        StatTile(tr("المشتريات"), purchases, Color(0xFF1565C0), Modifier.weight(1f))
                     }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatTile(tr("المصاريف"), expenses, OutColor, Modifier.weight(1f))
+                        StatTile(tr("ربح المبيعات"), profit, InColor, Modifier.weight(1f))
+                    }
+                    // الربح الصافي = ربح المبيعات − المصاريف
+                    StatTile(tr("الربح الصافي"), profit - expenses, if (profit - expenses < 0) OutColor else InColor, Modifier.fillMaxWidth())
                 }
             }
             item {
@@ -133,10 +145,16 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
 }
 
 @Composable
-private fun SummaryRow(label: String, value: Long, color: Color) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label)
-        Text(Money.format(value), color = color, fontWeight = FontWeight.SemiBold)
+private fun StatTile(label: String, value: Long, color: Color, modifier: Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.09f)),
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = color)
+            Text(Money.format(value), fontWeight = FontWeight.Bold, color = color, maxLines = 1)
+        }
     }
 }
 

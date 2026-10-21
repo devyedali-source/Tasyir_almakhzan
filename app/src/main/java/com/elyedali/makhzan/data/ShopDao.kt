@@ -171,8 +171,13 @@ abstract class ShopDao {
                         buyPrice = item.buyPrice, sellPrice = item.sellPrice, qty = 0, createdAt = time,
                     )
                 )
+            // تكلفة الشراء = المتوسط المرجّح بين المخزون القديم والكمية الجديدة (حساب دقيق للربح)
+            val before = productNow(pid)
+            val oldQty = (before?.qty ?: 0).coerceAtLeast(0)
+            val avgCost = if (before == null || oldQty == 0) item.buyPrice
+            else (before.buyPrice * oldQty + item.buyPrice * item.qty + (oldQty + item.qty) / 2) / (oldQty + item.qty)
             addQty(pid, item.qty)
-            updatePrices(pid, item.buyPrice, item.sellPrice)
+            updatePrices(pid, avgCost, item.sellPrice)
             insertLine(
                 OperationLine(
                     opId = opId, productId = pid, productName = item.name,
@@ -209,7 +214,16 @@ abstract class ShopDao {
                         )
                     }
                 }
-                opLines.forEach { addQty(it.productId, -it.qty) }
+                for (l in opLines) {
+                    val p = productNow(l.productId) ?: continue
+                    val remaining = p.qty - l.qty
+                    // إرجاع متوسط التكلفة إلى ما كان عليه قبل هذا الشراء
+                    if (remaining > 0) {
+                        val restored = (p.buyPrice * p.qty - l.unitPrice * l.qty).coerceAtLeast(0) / remaining
+                        updatePrices(p.id, restored, p.sellPrice)
+                    }
+                    addQty(l.productId, -l.qty)
+                }
             }
         }
         deleteLines(opId)

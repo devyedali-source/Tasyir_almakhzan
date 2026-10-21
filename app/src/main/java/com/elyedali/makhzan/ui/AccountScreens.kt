@@ -2,6 +2,12 @@ package com.elyedali.makhzan.ui
 
 import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -58,29 +64,47 @@ fun LoginScreen() {
     var error by remember { mutableStateOf<String?>(null) }
     var showLang by remember { mutableStateOf(false) }
 
-    Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(
-                Icons.Default.Inventory2, contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(84.dp),
+    Box(
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primary).systemBarsPadding().padding(28.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Box(
+                Modifier.size(104.dp).background(Color.White, RoundedCornerShape(28.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.QrCodeScanner, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(64.dp),
+                )
+            }
+            Text(
+                tr("تسيير المخزون والصندوق"), style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center,
             )
-            Text(tr("تسيير المخزون والصندوق"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(
                 tr("سجّل الدخول مرة واحدة بحساب Google. بعدها يعمل التطبيق دون إنترنت."),
-                textAlign = TextAlign.Center,
+                textAlign = TextAlign.Center, color = Color.White.copy(alpha = 0.9f),
             )
             Spacer(Modifier.height(8.dp))
-            if (busy) CircularProgressIndicator()
-            else Button(onClick = {
+            if (busy) CircularProgressIndicator(color = Color.White)
+            else Button(
+                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = MaterialTheme.colorScheme.primary),
+                shape = RoundedCornerShape(16.dp),
+                onClick = {
                 busy = true
                 error = null
                 scope.launch {
                     error = Auth.signInWithGoogle(activity)
                     busy = false
                 }
-            }, modifier = Modifier.fillMaxWidth()) { Text(tr("تسجيل الدخول بحساب Google")) }
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center) }
-            TextButton(onClick = { showLang = true }) { Text("🌐 " + (I18n.languages.first { it.code == I18n.lang }.nativeName)) }
+            }, modifier = Modifier.fillMaxWidth().height(54.dp)) {
+                Text(tr("تسجيل الدخول بحساب Google"), fontWeight = FontWeight.Bold)
+            }
+            error?.let { Text(it, color = Color(0xFFFFE0E0), textAlign = TextAlign.Center) }
+            TextButton(onClick = { showLang = true }) {
+                Text("🌐 " + (I18n.languages.first { it.code == I18n.lang }.nativeName), color = Color.White)
+            }
         }
     }
     if (showLang) LanguageDialog(onDismiss = { showLang = false })

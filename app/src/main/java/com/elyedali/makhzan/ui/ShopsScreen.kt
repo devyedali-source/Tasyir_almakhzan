@@ -1,6 +1,9 @@
 package com.elyedali.makhzan.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -110,13 +113,18 @@ fun ShopsScreen(
                 items(shops, key = { it.id }) { shop ->
                     Card(onClick = { onOpen(shop.id) }, modifier = Modifier.fillMaxWidth()) {
                         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.Storefront, contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp)
-                            )
+                            Box(
+                                Modifier.size(48.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(14.dp)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Default.Storefront, contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp)
+                                )
+                            }
                             Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text(shop.name, style = MaterialTheme.typography.titleMedium)
+                            Column(Modifier.weight(1f)) {
+                                Text(shop.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                                 Text(Plans.label(shop, now), style = MaterialTheme.typography.bodySmall)
                             }
                         }

@@ -3,6 +3,18 @@ package com.elyedali.makhzan.i18n
 /** قواميس الترجمة: المفتاح هو النص العربي كما هو في الواجهة */
 internal object Translations {
     val fr: Map<String, String> = hashMapOf(
+        "ينتهي التفعيل بعد %1\$s يوم" to "L'activation expire dans %1\$s jour(s)",
+        "الإعدادات" to "Paramètres",
+        "فتح إعدادات الهاتف" to "Ouvrir les paramètres du téléphone",
+        "المصباح" to "Lampe",
+        "الخروج دون تأكيد؟" to "Quitter sans valider ?",
+        "في السلة منتجات لم تُؤكَّد بعد. إذا خرجت ستُلغى." to "Le panier contient des articles non validés. Ils seront perdus si vous quittez.",
+        "خروج" to "Quitter",
+        "البقاء" to "Rester",
+        "هذا الشهر" to "Ce mois",
+        "الكل" to "Tout",
+        "ربح المبيعات" to "Bénéfice des ventes",
+        "الربح الصافي" to "Bénéfice net",
         "حذف المنتج" to "Supprimer le produit",
         "حذف" to "Supprimer",
         "سيُحذف «%1\$s» من قائمة المنتجات. سجل عملياته السابقة يبقى كما هو." to "« %1\$s » sera retiré de la liste des produits. L'historique de ses opérations est conservé.",
@@ -202,6 +214,18 @@ internal object Translations {
     )
 
     val en: Map<String, String> = hashMapOf(
+        "ينتهي التفعيل بعد %1\$s يوم" to "Activation expires in %1\$s day(s)",
+        "الإعدادات" to "Settings",
+        "فتح إعدادات الهاتف" to "Open phone settings",
+        "المصباح" to "Flashlight",
+        "الخروج دون تأكيد؟" to "Leave without confirming?",
+        "في السلة منتجات لم تُؤكَّد بعد. إذا خرجت ستُلغى." to "The cart has unconfirmed items. They will be discarded if you leave.",
+        "خروج" to "Leave",
+        "البقاء" to "Stay",
+        "هذا الشهر" to "This month",
+        "الكل" to "All",
+        "ربح المبيعات" to "Sales profit",
+        "الربح الصافي" to "Net profit",
         "حذف المنتج" to "Delete product",
         "حذف" to "Delete",
         "سيُحذف «%1\$s» من قائمة المنتجات. سجل عملياته السابقة يبقى كما هو." to "\"%1\$s\" will be removed from the product list. Its past operations are kept.",

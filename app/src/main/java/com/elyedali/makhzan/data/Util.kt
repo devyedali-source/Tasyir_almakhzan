@@ -63,11 +63,17 @@ object Qty {
 }
 
 object Dates {
-    private val full = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.US)
-    private val day = SimpleDateFormat("yyyy/MM/dd", Locale.US)
+    // نسخة جديدة في كل استدعاء لأن SimpleDateFormat غير آمن بين الخيوط (الفواتير تُنشأ في الخلفية)
+    fun format(t: Long): String = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.US).format(Date(t))
+    fun formatDay(t: Long): String = SimpleDateFormat("yyyy/MM/dd", Locale.US).format(Date(t))
 
-    fun format(t: Long): String = full.format(Date(t))
-    fun formatDay(t: Long): String = day.format(Date(t))
+    fun startOfMonth(): Long = Calendar.getInstance().apply {
+        set(Calendar.DAY_OF_MONTH, 1)
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
 
     fun startOfToday(): Long = Calendar.getInstance().apply {
         set(Calendar.HOUR_OF_DAY, 0)
@@ -106,6 +112,13 @@ object Plans {
         productCount + 1 <= 50 -> 1
         productCount + 1 <= 100 -> 2
         else -> 3
+    }
+
+    /** عدد الأيام الباقية إذا كان التفعيل سينتهي خلال أسبوع، وإلا null */
+    fun daysLeftIfSoon(shop: Shop, now: Long): Int? {
+        if (!isActive(shop, now)) return null
+        val days = ((shop.expiresAt - now) / 86_400_000L).toInt()
+        return if (days <= 7) days else null
     }
 
     fun label(shop: Shop, now: Long): String =

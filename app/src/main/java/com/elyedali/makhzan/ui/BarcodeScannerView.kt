@@ -1,6 +1,19 @@
 package com.elyedali.makhzan.ui
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import android.view.HapticFeedbackConstants
+import androidx.camera.core.Camera
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FlashlightOff
+import androidx.compose.material.icons.filled.FlashlightOn
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.platform.LocalView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.media.ToneGenerator
@@ -34,6 +47,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -65,10 +79,23 @@ fun BarcodeScannerView(
                 PackageManager.PERMISSION_GRANTED
         )
     }
+    var denied by remember { mutableStateOf(false) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         granted = it
+        denied = !it
     }
     LaunchedEffect(Unit) { if (!granted) launcher.launch(Manifest.permission.CAMERA) }
+    // إذا منح المستخدم الإذن من إعدادات الهاتف ثم عاد إلى التطبيق
+    DisposableEffect(lifecycleOwner) {
+        val obs = LifecycleEventObserver { _, e ->
+            if (e == Lifecycle.Event.ON_RESUME) {
+                granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
 
     val shape = RoundedCornerShape(16.dp)
     if (!granted) {
@@ -80,14 +107,24 @@ fun BarcodeScannerView(
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
                 Spacer(Modifier.height(12.dp))
-                Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) {
-                    Text(tr("السماح باستعمال الكاميرا"))
+                Button(onClick = {
+                    if (denied) {
+                        // بعد الرفض يجب منح الإذن من إعدادات الهاتف
+                        context.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+                        )
+                    } else launcher.launch(Manifest.permission.CAMERA)
+                }) {
+                    Text(if (denied) tr("فتح إعدادات الهاتف") else tr("السماح باستعمال الكاميرا"))
                 }
             }
         }
         return
     }
 
+    val view = LocalView.current
+    var camera by remember { mutableStateOf<Camera?>(null) }
+    var torchOn by remember { mutableStateOf(false) }
     val currentOnCode by rememberUpdatedState(onCode)
     val currentPaused by rememberUpdatedState(paused)
     val beeper = remember { runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, 90) }.getOrNull() }
@@ -128,6 +165,7 @@ fun BarcodeScannerView(
                             lastSeen = now
                             if (isNew) {
                                 beeper?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
+                                view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                                 currentOnCode(value)
                             }
                         }
@@ -136,7 +174,8 @@ fun BarcodeScannerView(
             }
             runCatching {
                 p.unbindAll()
-                p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                camera = p.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                torchOn = false
             }
         }, mainExecutor)
 
@@ -148,7 +187,7 @@ fun BarcodeScannerView(
     }
     DisposableEffect(Unit) { onDispose { beeper?.release() } }
 
-    Box(modifier.border(2.dp, Color(0xFF0B6E4F), shape)) {
+    Box(modifier.clip(shape).border(2.dp, Color(0xFF0B6E4F), shape)) {
         AndroidView(factory = { previewView }, modifier = Modifier.matchParentSize())
         Box(
             Modifier
@@ -159,6 +198,22 @@ fun BarcodeScannerView(
         )
         if (paused) {
             Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f)))
+        }
+        // زر المصباح للمحلات قليلة الإضاءة
+        if (camera?.cameraInfo?.hasFlashUnit() == true) {
+            IconButton(
+                onClick = {
+                    torchOn = !torchOn
+                    camera?.cameraControl?.enableTorch(torchOn)
+                },
+                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
+                    .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(50)),
+            ) {
+                Icon(
+                    if (torchOn) Icons.Default.FlashlightOn else Icons.Default.FlashlightOff,
+                    contentDescription = tr("المصباح"), tint = Color.White,
+                )
+            }
         }
     }
 }
