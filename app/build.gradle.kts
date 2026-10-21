@@ -14,8 +14,8 @@ android {
         applicationId = "com.elyedali.makhzan"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3"
     }
 
     // مفتاح التوقيع الثابت: يأتي من أسرار GitHub (KEYSTORE_BASE64 و KEYSTORE_PASSWORD)
@@ -24,6 +24,13 @@ android {
     val hasKeystore = keystoreFile.exists() && !keystorePassword.isNullOrEmpty()
 
     signingConfigs {
+        // مفتاح التجربة الثابت (موجود في المستودع، للتجربة فقط وليس للمتجر)
+        getByName("debug") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         if (hasKeystore) {
             create("upload") {
                 storeFile = keystoreFile
@@ -73,4 +80,17 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.3.4")
     implementation("androidx.camera:camera-view:1.3.4")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
+
+    // تسجيل الدخول والتفعيل (يحتاجان الإنترنت فقط)
+    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+
+    // النسخ الاحتياطي في الخلفية على Google Drive
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 }

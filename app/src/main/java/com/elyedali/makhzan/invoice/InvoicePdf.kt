@@ -27,30 +27,31 @@ data class InvoiceData(
     val total: Long get() = lines.sumOf { it.unitPrice * it.qty }
 }
 
-/** نصوص الفاتورة حسب اللغة: AR عربية، FR فرنسية، BI مزدوجة */
-class Labels(val lang: String) {
-    val rtl = lang != "FR"
-    private fun t(ar: String, fr: String) = when (lang) {
+/** نصوص الفاتورة حسب اللغة: AR عربية، FR فرنسية، EN إنجليزية، BI مزدوجة (عربية + فرنسية) */
+class Labels(val lang: String, customCurrency: String = "") {
+    val rtl = lang == "AR" || lang == "BI"
+    private fun t(ar: String, fr: String, en: String) = when (lang) {
         "FR" -> fr
+        "EN" -> en
         "BI" -> "$ar / $fr"
         else -> ar
     }
 
-    val title = t("فاتورة", "FACTURE")
-    val number = t("رقم الفاتورة", "N° Facture")
-    val date = t("التاريخ", "Date")
-    val product = t("المنتج", "Désignation")
-    val qty = t("الكمية", "Qté")
-    val unit = t("سعر الوحدة", "P.U.")
-    val amount = t("المبلغ", "Montant")
-    val total = t("المجموع الكلي", "Total")
-    val tax = t("الرقم الضريبي", "NIF")
-    val phone = t("الهاتف", "Tél")
-    val address = t("العنوان", "Adresse")
-    val email = t("التواصل", "Contact")
-    val thanks = t("شكرًا لزيارتكم", "Merci de votre visite")
-    val currency = if (lang == "FR") "MRU" else if (lang == "BI") "أوقية MRU" else "أوقية"
-    val itemsCount = t("عدد القطع", "Nb articles")
+    val title = t("فاتورة", "FACTURE", "INVOICE")
+    val number = t("رقم الفاتورة", "N° Facture", "Invoice No.")
+    val date = t("التاريخ", "Date", "Date")
+    val product = t("المنتج", "Désignation", "Item")
+    val qty = t("الكمية", "Qté", "Qty")
+    val unit = t("سعر الوحدة", "P.U.", "Unit price")
+    val amount = t("المبلغ", "Montant", "Amount")
+    val total = t("المجموع الكلي", "Total", "Total")
+    val tax = t("الرقم الضريبي", "NIF", "Tax ID")
+    val phone = t("الهاتف", "Tél", "Phone")
+    val address = t("العنوان", "Adresse", "Address")
+    val email = t("التواصل", "Contact", "Contact")
+    val thanks = t("شكرًا لزيارتكم", "Merci de votre visite", "Thank you for your visit")
+    val currency = customCurrency.ifBlank { t("أوقية", "MRU", "MRU").let { if (lang == "BI") "أوقية MRU" else it } }
+    val itemsCount = t("عدد القطع", "Nb articles", "Items")
 
     fun money(v: Long) = "${Money.format(v, withCurrency = false)} $currency"
     fun plain(v: Long) = Money.format(v, withCurrency = false)
@@ -75,7 +76,7 @@ object InvoicePdf {
     ): File {
         val dir = File(context.cacheDir, "invoices").apply { mkdirs() }
         val file = File(dir, fileName)
-        val labels = Labels(profile.language)
+        val labels = Labels(profile.language, profile.currency)
         val logo = profile.logoPath?.let { runCatching { BitmapFactory.decodeFile(it) }.getOrNull() }
         val doc = PdfDocument()
         try {

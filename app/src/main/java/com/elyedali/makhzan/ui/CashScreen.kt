@@ -26,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +39,7 @@ import com.elyedali.makhzan.data.OpType
 import com.elyedali.makhzan.data.Operation
 import com.elyedali.makhzan.data.OperationLine
 import com.elyedali.makhzan.data.ShopDao
+import kotlinx.coroutines.launch
 
 private val InColor = Color(0xFF0B6E4F)
 private val OutColor = Color(0xFFC62828)
@@ -101,7 +103,7 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
             items(ops, key = { it.id }) { op ->
                 val isIn = op.type == OpType.SALE
                 Card(
-                    onClick = { if (op.type != OpType.EXPENSE) opened = op },
+                    onClick = { opened = op },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -140,12 +142,16 @@ private fun SummaryRow(label: String, value: Long, color: Color) {
 @Composable
 private fun OperationLinesDialog(dao: ShopDao, op: Operation, onDismiss: () -> Unit, onInvoice: () -> Unit) {
     var lines by remember { mutableStateOf<List<OperationLine>>(emptyList()) }
+    var confirmCancel by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     LaunchedEffect(op.id) { lines = dao.lines(op.id) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("${OpType.label(op.type)} — ${Dates.format(op.time)}") },
+        title = { Text(OpType.label(op.type) + " — " + Dates.format(op.time)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (op.note.isNotBlank()) Text(op.note)
                 lines.forEach { l ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("${l.productName} × ${l.qty}", modifier = Modifier.weight(1f))
@@ -157,6 +163,10 @@ private fun OperationLinesDialog(dao: ShopDao, op: Operation, onDismiss: () -> U
                     Text("المجموع", fontWeight = FontWeight.Bold)
                     Text(Money.format(op.total), fontWeight = FontWeight.Bold)
                 }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = { confirmCancel = true }) {
+                    Text("إلغاء هذه العملية", color = MaterialTheme.colorScheme.error)
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("إغلاق") } },
@@ -164,4 +174,25 @@ private fun OperationLinesDialog(dao: ShopDao, op: Operation, onDismiss: () -> U
             if (op.type == OpType.SALE) TextButton(onClick = onInvoice) { Text("الفاتورة") }
         },
     )
+    if (confirmCancel) {
+        AlertDialog(
+            onDismissRequest = { confirmCancel = false },
+            title = { Text("إلغاء العملية") },
+            text = { Text("ستُحذف هذه العملية ويعود المخزون والصندوق كما كانا قبلها. هل تريد المتابعة؟") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmCancel = false
+                    scope.launch {
+                        try {
+                            dao.cancelOperation(op.id)
+                            onDismiss()
+                        } catch (e: IllegalStateException) {
+                            error = e.message
+                        }
+                    }
+                }) { Text("نعم، إلغاء العملية", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmCancel = false }) { Text("تراجع") } },
+        )
+    }
 }

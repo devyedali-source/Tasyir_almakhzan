@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == "elyedalimoctar@gmail.com"
+        && request.auth.token.email_verified == true;
+    }
+
+    // وثيقة تفعيل لكل محل: يقرؤها صاحبها فقط، ويكتبها المسؤول وحده
+    match /shops/{shopId} {
+      allow read: if request.auth != null
+        && (resource == null || resource.data.ownerUid == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // كل ما عدا ذلك ممنوع
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.elyedali.makhzan.data.Money
 import com.elyedali.makhzan.data.ShopDao
 import com.elyedali.makhzan.data.ShopProfile
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +68,7 @@ private val designs = listOf(
 private val languages = listOf(
     "AR" to "العربية",
     "FR" to "Français",
+    "EN" to "English",
     "BI" to "مزدوجة (العربية + Français)",
 )
 
@@ -87,6 +89,7 @@ fun SettingsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPreview: ()
     var design by remember { mutableStateOf(0) }
     var language by remember { mutableStateOf("AR") }
     var stamp by remember { mutableStateOf(true) }
+    var currency by remember { mutableStateOf("") }
 
     LaunchedEffect(shopId) {
         val shop = dao.shopNow(shopId)
@@ -94,6 +97,7 @@ fun SettingsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPreview: ()
         name = shop?.name ?: ""
         address = p.address; phone = p.phone; email = p.email; tax = p.taxNumber
         logoPath = p.logoPath; design = p.design; language = p.language; stamp = p.showStamp
+        currency = p.currency
         logoBmp = p.logoPath?.let { withContext(Dispatchers.IO) { BitmapFactory.decodeFile(it) } }
         loaded = true
     }
@@ -115,9 +119,10 @@ fun SettingsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPreview: ()
             ShopProfile(
                 shopId = shopId, address = address.trim(), phone = phone.trim(), email = email.trim(),
                 taxNumber = tax.trim(), logoPath = logoPath, design = design,
-                language = language, showStamp = stamp,
+                language = language, showStamp = stamp, currency = currency.trim(),
             )
         )
+        Money.currency = currency.trim()
         return true
     }
 
@@ -136,6 +141,7 @@ fun SettingsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPreview: ()
             Field(phone, { phone = it }, "رقم الهاتف")
             Field(email, { email = it }, "معلومات التواصل (واتساب، بريد…)")
             Field(tax, { tax = it }, "الرقم الضريبي (NIF)")
+            Field(currency, { currency = it }, "العملة (اتركها فارغة للأوقية)")
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(

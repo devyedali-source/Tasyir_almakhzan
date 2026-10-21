@@ -1,9 +1,11 @@
 package com.elyedali.makhzan.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.elyedali.makhzan.i18n.tr
 
 /**
  * كل المبالغ مخزنة بوحدة صغرى (المبلغ × 100) في Long لضمان حساب دقيق بلا أخطاء كسور.
@@ -19,6 +21,8 @@ data class Shop(
     val tier: Int = 0,
     /** تاريخ انتهاء التفعيل (0 = غير مفعل) */
     val expiresAt: Long = 0,
+    /** معرّف ثابت للمحل على الخادم (يُستعمل في التفعيل، ولا يتغير بعد الاسترجاع من Drive) */
+    @ColumnInfo(defaultValue = "") val remoteId: String = "",
 )
 
 @Entity(
@@ -42,9 +46,9 @@ object OpType {
     const val EXPENSE = "EXPENSE"
 
     fun label(type: String) = when (type) {
-        SALE -> "بيع"
-        PURCHASE -> "شراء"
-        EXPENSE -> "مصروف"
+        SALE -> tr("بيع")
+        PURCHASE -> tr("شراء")
+        EXPENSE -> tr("مصروف")
         else -> type
     }
 }
@@ -115,4 +119,6 @@ data class ShopProfile(
     /** AR / FR / BI (مزدوجة) */
     val language: String = "AR",
     val showStamp: Boolean = true,
+    /** عملة المحل: فارغة = الأوقية (الافتراضي)، ويمكن للمستخدم كتابة عملة أخرى */
+    @ColumnInfo(defaultValue = "") val currency: String = "",
 )

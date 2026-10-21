@@ -23,6 +23,18 @@ abstract class ShopDao {
     @Insert
     abstract suspend fun insertShop(shop: Shop): Long
 
+    @Query("SELECT COUNT(*) FROM shops")
+    abstract suspend fun shopCount(): Int
+
+    @Query("SELECT * FROM shops WHERE remoteId = ''")
+    abstract suspend fun shopsWithoutRemoteId(): List<Shop>
+
+    @Query("UPDATE shops SET remoteId = :remoteId WHERE id = :id")
+    abstract suspend fun setRemoteId(id: Long, remoteId: String)
+
+    @Query("UPDATE shops SET tier = :tier, expiresAt = :expiresAt WHERE id = :id")
+    abstract suspend fun updateActivation(id: Long, tier: Int, expiresAt: Long)
+
     @Query("UPDATE shops SET name = :name WHERE id = :id")
     abstract suspend fun updateShopName(id: Long, name: String)
 
@@ -165,5 +177,37 @@ abstract class ShopDao {
             )
         }
         return opId
+    }
+
+    @Query("DELETE FROM operation_lines WHERE opId = :opId")
+    abstract suspend fun deleteLines(opId: Long)
+
+    @Query("DELETE FROM operations WHERE id = :id")
+    abstract suspend fun deleteOperation(id: Long)
+
+    /**
+     * إلغاء عملية خاطئة: يعيد المخزون والصندوق كما كانا قبلها.
+     * لا يُقبل إلغاء شراء إذا كان جزء من بضاعته قد بيع بعده.
+     */
+    @Transaction
+    open suspend fun cancelOperation(opId: Long) {
+        val op = operationNow(opId) ?: return
+        val opLines = lines(opId)
+        when (op.type) {
+            OpType.SALE -> opLines.forEach { addQty(it.productId, it.qty) }
+            OpType.PURCHASE -> {
+                for (l in opLines) {
+                    val p = productNow(l.productId)
+                    if (p == null || p.qty < l.qty) {
+                        throw IllegalStateException(
+                            "لا يمكن إلغاء هذا الشراء: بيع جزء من «${l.productName}» بعده"
+                        )
+                    }
+                }
+                opLines.forEach { addQty(it.productId, -it.qty) }
+            }
+        }
+        deleteLines(opId)
+        deleteOperation(opId)
     }
 }

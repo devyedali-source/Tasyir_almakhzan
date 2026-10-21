@@ -37,7 +37,9 @@ import com.elyedali.makhzan.data.Money
 import com.elyedali.makhzan.data.Plans
 import com.elyedali.makhzan.data.PurchaseItem
 import com.elyedali.makhzan.data.Qty
+import com.elyedali.makhzan.data.Shop
 import com.elyedali.makhzan.data.ShopDao
+import com.elyedali.makhzan.i18n.tr
 import kotlinx.coroutines.launch
 
 /** منتج مقروء ينتظر إدخال الكمية والأسعار */
@@ -58,6 +60,8 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var pending by remember { mutableStateOf<PendingScan?>(null) }
     var limitMessage by remember { mutableStateOf<String?>(null) }
+    var activationShop by remember { mutableStateOf<Shop?>(null) }
+    var activationCount by remember { mutableStateOf(0) }
 
     fun toast(msg: String) {
         scope.launch {
@@ -85,8 +89,10 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                     val newInCart = cart.count { it.productId == null }
                     val limit = Plans.limit(shop, now)
                     if (dao.productCount(shopId) + newInCart + 1 > limit) {
-                        limitMessage = "وصل هذا المحل إلى حد ${Plans.limitText(shop, now)} منتجات.\n" +
-                            "لإضافة منتجات جديدة يجب تفعيل المحل."
+                        limitMessage = tr(
+                            "وصل هذا المحل إلى حد %1\$s منتجات.\nلإضافة منتجات جديدة يجب تفعيل المحل أو ترقية الباقة.",
+                            Plans.limitText(shop, now),
+                        )
                     } else {
                         pending = PendingScan(code, null, "", null, null, null)
                     }
@@ -200,7 +206,24 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
     }
 
     limitMessage?.let { msg ->
-        InfoDialog(title = "حد المنتجات", message = msg, onDismiss = { limitMessage = null })
+        AlertDialog(
+            onDismissRequest = { limitMessage = null },
+            title = { Text("حد المنتجات") },
+            text = { Text(msg) },
+            confirmButton = {
+                TextButton(onClick = {
+                    limitMessage = null
+                    scope.launch {
+                        activationShop = dao.shopNow(shopId)
+                        activationCount = dao.productCount(shopId)
+                    }
+                }) { Text("تفعيل المحل") }
+            },
+            dismissButton = { TextButton(onClick = { limitMessage = null }) { Text("إغلاق") } },
+        )
+    }
+    activationShop?.let { sh ->
+        ActivationDialog(dao, sh, activationCount, onDismiss = { activationShop = null })
     }
 }
 

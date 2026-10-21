@@ -1,5 +1,9 @@
 package com.elyedali.makhzan.data
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.elyedali.makhzan.i18n.tr
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.SimpleDateFormat
@@ -22,7 +26,10 @@ private fun String.westernDigits(): String = buildString {
 }
 
 object Money {
-    const val CURRENCY = "أوقية"
+    /** عملة المحل المفتوح حاليًا (فارغة = الأوقية بلغة الواجهة) */
+    var currency by mutableStateOf("")
+
+    fun currencyLabel(): String = currency.ifBlank { tr("أوقية") }
 
     fun format(minor: Long, withCurrency: Boolean = true): String {
         val a = abs(minor)
@@ -31,7 +38,7 @@ object Money {
         val num = if (frac == 0L) String.format(Locale.US, "%,d", whole)
         else String.format(Locale.US, "%,d.%02d", whole, frac)
         val sign = if (minor < 0) "-" else ""
-        return if (withCurrency) "$sign$num $CURRENCY" else "$sign$num"
+        return if (withCurrency) "$sign$num ${currencyLabel()}" else "$sign$num"
     }
 
     /** يحول النص المكتوب إلى مبلغ بالوحدة الصغرى، أو null إذا لم يكن صالحًا */
@@ -84,10 +91,25 @@ object Plans {
 
     fun limitText(shop: Shop, now: Long): String {
         val l = limit(shop, now)
-        return if (l == Int.MAX_VALUE) "بلا حد" else l.toString()
+        return if (l == Int.MAX_VALUE) tr("بلا حد") else l.toString()
+    }
+
+    /**
+     * المحل مقفل إذا تجاوز عدد منتجاته الحد المجاني وانتهى تفعيله (أو لم يُفعّل):
+     * يُمنع البيع والشراء حتى التجديد، وتبقى التقارير والبيانات كاملة.
+     */
+    fun isLocked(shop: Shop, productCount: Int, now: Long) =
+        productCount > FREE_LIMIT && !isActive(shop, now)
+
+    /** أقل باقة تتسع لمنتج إضافي واحد على الأقل */
+    fun neededTier(productCount: Int): Int = when {
+        productCount + 1 <= 50 -> 1
+        productCount + 1 <= 100 -> 2
+        else -> 3
     }
 
     fun label(shop: Shop, now: Long): String =
-        if (isActive(shop, now)) "مفعّل حتى ${Dates.formatDay(shop.expiresAt)}"
-        else "مجاني (أقل من 10 منتجات)"
+        if (isActive(shop, now)) tr("مفعّل حتى %1\$s", Dates.formatDay(shop.expiresAt))
+        else if (shop.tier > 0) tr("انتهى التفعيل في %1\$s", Dates.formatDay(shop.expiresAt))
+        else tr("مجاني (أقل من 10 منتجات)")
 }

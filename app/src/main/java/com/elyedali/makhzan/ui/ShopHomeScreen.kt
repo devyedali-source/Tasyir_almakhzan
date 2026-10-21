@@ -30,6 +30,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +45,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.elyedali.makhzan.Route
+import com.elyedali.makhzan.activation.Activation
+import com.elyedali.makhzan.i18n.tr
 import com.elyedali.makhzan.data.Dates
 import com.elyedali.makhzan.data.Money
 import com.elyedali.makhzan.data.OpType
@@ -61,6 +64,12 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
     val profitToday by dao.profit(shopId, today).collectAsState(initial = 0L)
     val count by dao.productCountFlow(shopId).collectAsState(initial = 0)
     var showExpense by remember { mutableStateOf(false) }
+    var showActivation by remember { mutableStateOf(false) }
+
+    // قراءة واحدة لحالة التفعيل من الخادم عند أول فتح للمحل في هذه الجلسة
+    LaunchedEffect(shopId) {
+        if (Activation.markRefreshed(shopId)) dao.shopNow(shopId)?.let { Activation.refresh(dao, it) }
+    }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val now = System.currentTimeMillis()
@@ -104,18 +113,43 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
             }
 
             shop?.let {
-                Text(
-                    "المنتجات: $count من ${Plans.limitText(it, now)} — ${Plans.label(it, now)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                val locked = Plans.isLocked(it, count, now)
+                Card(
+                    onClick = { showActivation = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (locked) MaterialTheme.colorScheme.errorContainer
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                ) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(tr("المنتجات: %1\$s من %2\$s", count, Plans.limitText(it, now)), fontWeight = FontWeight.SemiBold)
+                            Text(Plans.label(it, now), style = MaterialTheme.typography.bodySmall)
+                            if (locked) {
+                                Text(
+                                    "انتهى التفعيل: البيع والشراء متوقفان حتى التجديد. بياناتك محفوظة كاملة.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
+                        Text(
+                            if (Plans.isActive(it, now)) "تجديد / ترقية" else "تفعيل",
+                            color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ActionTile("بيع", Icons.Default.PointOfSale, Color(0xFF0B6E4F), Modifier.weight(1f)) {
-                    go(Route.Sale(shopId))
+                    if (shop?.let { Plans.isLocked(it, count, System.currentTimeMillis()) } == true) showActivation = true
+                    else go(Route.Sale(shopId))
                 }
                 ActionTile("شراء (إدخال بضاعة)", Icons.Default.AddShoppingCart, Color(0xFF1565C0), Modifier.weight(1f)) {
-                    go(Route.Purchase(shopId))
+                    if (shop?.let { Plans.isLocked(it, count, System.currentTimeMillis()) } == true) showActivation = true
+                    else go(Route.Purchase(shopId))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -135,6 +169,11 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
                 }
             }
         }
+    }
+
+    val s = shop
+    if (showActivation && s != null) {
+        ActivationDialog(dao, s, count, onDismiss = { showActivation = false })
     }
 
     if (showExpense) {

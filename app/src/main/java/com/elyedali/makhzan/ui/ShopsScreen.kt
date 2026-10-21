@@ -14,9 +14,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,16 +43,24 @@ import com.elyedali.makhzan.data.Plans
 import com.elyedali.makhzan.data.Shop
 import com.elyedali.makhzan.data.ShopDao
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 @Composable
-fun ShopsScreen(dao: ShopDao, onOpen: (Long) -> Unit) {
+fun ShopsScreen(dao: ShopDao, onOpen: (Long) -> Unit, driveOk: Boolean, requestDrive: () -> Unit) {
     val shops by dao.shops().collectAsState(initial = emptyList())
     var showAdd by remember { mutableStateOf(false) }
+    var showAccount by remember { mutableStateOf(false) }
+    var showLang by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val now = System.currentTimeMillis()
 
     Scaffold(
-        topBar = { AppTopBar("محلاتي التجارية") },
+        topBar = {
+            AppTopBar("محلاتي التجارية", actions = {
+                IconButton(onClick = { showLang = true }) { Icon(Icons.Default.Language, contentDescription = "لغة التطبيق") }
+                IconButton(onClick = { showAccount = true }) { Icon(Icons.Default.AccountCircle, contentDescription = "حسابي") }
+            })
+        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAdd = true },
@@ -55,8 +69,25 @@ fun ShopsScreen(dao: ShopDao, onOpen: (Long) -> Unit) {
             )
         },
     ) { pad ->
+      Column(Modifier.padding(pad).fillMaxSize()) {
+        if (!driveOk) {
+            Card(
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+            ) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.CloudOff, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "الحفظ التلقائي على Google Drive غير مفعّل بعد",
+                        modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+                    )
+                    TextButton(onClick = requestDrive) { Text("تفعيل الآن") }
+                }
+            }
+        }
         if (shops.isEmpty()) {
-            Box(Modifier.padding(pad).fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     "لا توجد محلات بعد.\nاضغط «إنشاء محل تجاري» للبدء.",
                     textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge,
@@ -64,7 +95,7 @@ fun ShopsScreen(dao: ShopDao, onOpen: (Long) -> Unit) {
             }
         } else {
             LazyColumn(
-                Modifier.padding(pad).fillMaxSize(),
+                Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -85,7 +116,11 @@ fun ShopsScreen(dao: ShopDao, onOpen: (Long) -> Unit) {
                 }
             }
         }
+      }
     }
+
+    if (showAccount) AccountDialog(onDismiss = { showAccount = false }, onEnableDrive = { showAccount = false; requestDrive() })
+    if (showLang) LanguageDialog(onDismiss = { showLang = false })
 
     if (showAdd) {
         TextInputDialog(
@@ -95,7 +130,11 @@ fun ShopsScreen(dao: ShopDao, onOpen: (Long) -> Unit) {
             onDismiss = { showAdd = false },
             onConfirm = { name ->
                 showAdd = false
-                scope.launch { dao.insertShop(Shop(name = name, createdAt = System.currentTimeMillis())) }
+                scope.launch {
+                    dao.insertShop(
+                        Shop(name = name, createdAt = System.currentTimeMillis(), remoteId = UUID.randomUUID().toString())
+                    )
+                }
             },
         )
     }
