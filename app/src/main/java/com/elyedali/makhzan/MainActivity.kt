@@ -168,7 +168,8 @@ private fun DriveSetup(
     val activity = LocalContext.current as Activity
     var phase by remember(uid) {
         mutableStateOf<Phase>(
-            if (Prefs.restoreChecked(activity, uid) && !Prefs.driveNeedsConsent(activity)) Phase.Ready else Phase.Checking
+            // لا نلحّ على المستخدم: إذا رفض الإذن من قبل نكتفي بشريط هادئ في الصفحة الرئيسية
+            if (Prefs.restoreChecked(activity, uid) || Prefs.driveNeedsConsent(activity)) Phase.Ready else Phase.Checking
         )
     }
     var attempt by remember { mutableStateOf(0) }
@@ -321,7 +322,10 @@ private fun AppRoot(
     }
 
     when (val r = stack.last()) {
-        Route.Shops -> ShopsScreen(dao, onOpen = { go(Route.Home(it)) }, driveOk = driveOk, requestDrive = requestDrive)
+        Route.Shops -> ShopsScreen(
+            dao, onOpen = { go(Route.Home(it)) }, driveOk = driveOk, requestDrive = requestDrive,
+            onAdminLink = { go(Route.AdminActivate(it)) },
+        )
         is Route.Home -> ShopHomeScreen(dao, r.shopId, onBack = ::back, go = ::go)
         is Route.Sale -> SaleScreen(dao, r.shopId, onBack = ::back, onInvoice = { go(Route.Invoice(r.shopId, it)) })
         is Route.Purchase -> PurchaseScreen(dao, r.shopId, onBack = ::back)

@@ -3,6 +3,11 @@ package com.elyedali.makhzan.i18n
 /** قواميس الترجمة: المفتاح هو النص العربي كما هو في الواجهة */
 internal object Translations {
     val fr: Map<String, String> = hashMapOf(
+        "حذف المنتج" to "Supprimer le produit",
+        "حذف" to "Supprimer",
+        "سيُحذف «%1\$s» من قائمة المنتجات. سجل عملياته السابقة يبقى كما هو." to "« %1\$s » sera retiré de la liste des produits. L'historique de ses opérations est conservé.",
+        "انسخ رسالة طلب التفعيل أولًا ثم أعد المحاولة" to "Copiez d'abord le message de demande d'activation, puis réessayez",
+        "تفعيل من رابط منسوخ" to "Activer depuis un lien copié",
         "تعذر استرجاع النسخة الاحتياطية: %1\$s" to "Impossible de restaurer la sauvegarde : %1\$s",
         "جارٍ استرجاع بياناتك من Google Drive…" to "Restauration de vos données depuis Google Drive…",
         "جارٍ التحقق من النسخة الاحتياطية على Google Drive…" to "Vérification de la sauvegarde sur Google Drive…",
@@ -197,6 +202,11 @@ internal object Translations {
     )
 
     val en: Map<String, String> = hashMapOf(
+        "حذف المنتج" to "Delete product",
+        "حذف" to "Delete",
+        "سيُحذف «%1\$s» من قائمة المنتجات. سجل عملياته السابقة يبقى كما هو." to "\"%1\$s\" will be removed from the product list. Its past operations are kept.",
+        "انسخ رسالة طلب التفعيل أولًا ثم أعد المحاولة" to "Copy the activation request message first, then try again",
+        "تفعيل من رابط منسوخ" to "Activate from a copied link",
         "تعذر استرجاع النسخة الاحتياطية: %1\$s" to "Could not restore the backup: %1\$s",
         "جارٍ استرجاع بياناتك من Google Drive…" to "Restoring your data from Google Drive…",
         "جارٍ التحقق من النسخة الاحتياطية على Google Drive…" to "Checking your backup on Google Drive…",

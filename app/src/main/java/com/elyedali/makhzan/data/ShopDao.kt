@@ -77,6 +77,10 @@ abstract class ShopDao {
     @Query("UPDATE products SET buyPrice = :buy, sellPrice = :sell WHERE id = :id")
     abstract suspend fun updatePrices(id: Long, buy: Long, sell: Long)
 
+    /** حذف منتج كميته صفر (مثلًا سُجّل خطأً). سجل حركاته القديمة يبقى باسمه. */
+    @Query("DELETE FROM products WHERE id = :id AND qty = 0")
+    abstract suspend fun deleteEmptyProduct(id: Long): Int
+
     @Query("UPDATE products SET name = :name, sellPrice = :sell WHERE id = :id")
     abstract suspend fun updateNameAndSellPrice(id: Long, name: String, sell: Long)
 

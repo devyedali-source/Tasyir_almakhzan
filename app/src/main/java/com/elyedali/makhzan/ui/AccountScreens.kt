@@ -35,6 +35,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import android.net.Uri
+import androidx.compose.ui.platform.LocalClipboardManager
+import com.elyedali.makhzan.activation.Activation
+import com.elyedali.makhzan.activation.ActivationRequest
 import com.elyedali.makhzan.auth.Auth
 import com.elyedali.makhzan.backup.DriveAccess
 import com.elyedali.makhzan.backup.DriveBackup
@@ -107,13 +111,14 @@ fun LanguageDialog(onDismiss: () -> Unit) {
 
 /** معلومات الحساب: البريد، آخر حفظ على Drive، وتسجيل الخروج */
 @Composable
-fun AccountDialog(onDismiss: () -> Unit, onEnableDrive: () -> Unit) {
+fun AccountDialog(onDismiss: () -> Unit, onEnableDrive: () -> Unit, onAdminLink: (ActivationRequest) -> Unit) {
     val activity = LocalContext.current as Activity
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var confirmLogout by remember { mutableStateOf(false) }
     val last = Prefs.lastBackupAt(activity)
+    val clipboard = LocalClipboardManager.current
 
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
@@ -128,6 +133,15 @@ fun AccountDialog(onDismiss: () -> Unit, onEnableDrive: () -> Unit) {
                 )
                 if (Prefs.driveNeedsConsent(activity)) {
                     OutlinedButton(onClick = onEnableDrive) { Text(tr("تفعيل الحفظ على Drive")) }
+                }
+                if (Auth.isAdmin()) {
+                    // للمسؤول: إذا لم يفتح الرابط التطبيقَ مباشرة، ينسخ رسالة واتساب ثم يضغط هنا
+                    OutlinedButton(onClick = {
+                        val text = clipboard.getText()?.text.orEmpty()
+                        val url = Regex("https://stockcaisse\\.web\\.app/activate\\S+").find(text)?.value
+                        val req = url?.let { Activation.parse(Uri.parse(it)) }
+                        if (req != null) onAdminLink(req) else message = tr("انسخ رسالة طلب التفعيل أولًا ثم أعد المحاولة")
+                    }) { Text(tr("تفعيل من رابط منسوخ")) }
                 }
                 if (busy) CircularProgressIndicator()
                 message?.let { Text(it, color = MaterialTheme.colorScheme.error) }

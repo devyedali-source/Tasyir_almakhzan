@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.elyedali.makhzan.activation.ActivationRequest
 import com.elyedali.makhzan.data.Plans
 import com.elyedali.makhzan.data.Shop
 import com.elyedali.makhzan.data.ShopDao
@@ -47,7 +48,13 @@ import java.util.UUID
 import com.elyedali.makhzan.i18n.tr
 
 @Composable
-fun ShopsScreen(dao: ShopDao, onOpen: (Long) -> Unit, driveOk: Boolean, requestDrive: () -> Unit) {
+fun ShopsScreen(
+    dao: ShopDao,
+    onOpen: (Long) -> Unit,
+    driveOk: Boolean,
+    requestDrive: () -> Unit,
+    onAdminLink: (ActivationRequest) -> Unit,
+) {
     val shops by dao.shops().collectAsState(initial = emptyList())
     var showAdd by remember { mutableStateOf(false) }
     var showAccount by remember { mutableStateOf(false) }
@@ -120,7 +127,11 @@ fun ShopsScreen(dao: ShopDao, onOpen: (Long) -> Unit, driveOk: Boolean, requestD
       }
     }
 
-    if (showAccount) AccountDialog(onDismiss = { showAccount = false }, onEnableDrive = { showAccount = false; requestDrive() })
+    if (showAccount) AccountDialog(
+        onDismiss = { showAccount = false },
+        onEnableDrive = { showAccount = false; requestDrive() },
+        onAdminLink = { showAccount = false; onAdminLink(it) },
+    )
     if (showLang) LanguageDialog(onDismiss = { showLang = false })
 
     if (showAdd) {

@@ -115,6 +115,7 @@ fun ProductDetailScreen(dao: ShopDao, productId: Long, onBack: () -> Unit) {
     val product by dao.product(productId).collectAsState(initial = null)
     val moves by dao.movements(productId).collectAsState(initial = emptyList())
     var editing by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Scaffold(topBar = { AppTopBar(product?.name ?: "", onBack) }) { pad ->
@@ -132,6 +133,11 @@ fun ProductDetailScreen(dao: ShopDao, productId: Long, onBack: () -> Unit) {
                             Text(tr("سعر الشراء: %1\$s", Money.format(p.buyPrice)))
                             Text(tr("سعر البيع: %1\$s", Money.format(p.sellPrice)))
                             OutlinedButton(onClick = { editing = true }) { Text(tr("تعديل الاسم وسعر البيع")) }
+                            if (p.qty == 0) {
+                                TextButton(onClick = { confirmDelete = true }) {
+                                    Text(tr("حذف المنتج"), color = MaterialTheme.colorScheme.error)
+                                }
+                            }
                         }
                     }
                 }
@@ -164,6 +170,20 @@ fun ProductDetailScreen(dao: ShopDao, productId: Long, onBack: () -> Unit) {
     }
 
     val p = product
+    if (confirmDelete && p != null) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(tr("حذف المنتج")) },
+            text = { Text(tr("سيُحذف «%1\$s» من قائمة المنتجات. سجل عملياته السابقة يبقى كما هو.", p.name)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    scope.launch { if (dao.deleteEmptyProduct(p.id) > 0) onBack() }
+                }) { Text(tr("حذف"), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(tr("إلغاء")) } },
+        )
+    }
     if (editing && p != null) {
         var name by remember { mutableStateOf(p.name) }
         var sell by remember { mutableStateOf(Money.toInput(p.sellPrice)) }
