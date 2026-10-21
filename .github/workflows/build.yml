@@ -17,14 +17,31 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Restore signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > makhzan-upload-key.jks
+            echo "Signing key restored"
+          else
+            echo "No signing key secret: using temporary debug key"
+          fi
+
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Build APK
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/makhzan-upload-key.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Print signing fingerprint
+        run: keytool -printcert -jarfile app/build/outputs/apk/release/*.apk | grep -E "SHA1|SHA256" || true
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: makhzan-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: app/build/outputs/apk/release/*.apk

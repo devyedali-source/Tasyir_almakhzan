@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -17,9 +18,26 @@ android {
         versionName = "0.2"
     }
 
+    // مفتاح التوقيع الثابت: يأتي من أسرار GitHub (KEYSTORE_BASE64 و KEYSTORE_PASSWORD)
+    val keystoreFile = file(System.getenv("KEYSTORE_PATH") ?: "${rootDir}/makhzan-upload-key.jks")
+    val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+    val hasKeystore = keystoreFile.exists() && !keystorePassword.isNullOrEmpty()
+
+    signingConfigs {
+        if (hasKeystore) {
+            create("upload") {
+                storeFile = keystoreFile
+                storePassword = keystorePassword
+                keyAlias = "upload"
+                keyPassword = keystorePassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = if (hasKeystore) signingConfigs.getByName("upload") else signingConfigs.getByName("debug")
         }
     }
     compileOptions {

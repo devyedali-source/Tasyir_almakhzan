@@ -1,0 +1,76 @@
+{
+  "project_info": {
+    "project_number": "469122739244",
+    "project_id": "stockcaisse",
+    "storage_bucket": "stockcaisse.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:469122739244:android:558292b6763598b128f589",
+        "android_client_info": {
+          "package_name": "com.elyedali.makhzan"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "469122739244-pl52147jre6t6e4urjulc3mkvu8io6d3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEjDFJKeKC0NKKELlTN7vzTymXWmU6cHo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "469122739244-pl52147jre6t6e4urjulc3mkvu8io6d3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:469122739244:android:f4286728a1d8a3fe28f589",
+        "android_client_info": {
+          "package_name": "com.example.inventorycash"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "469122739244-2bd69t11tn1bh45mgsi9g30pf94ncgkm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.inventorycash",
+            "certificate_hash": "fe290f67cfc9f0f0f8efe55b7e6e4983d69c1e76"
+          }
+        },
+        {
+          "client_id": "469122739244-pl52147jre6t6e4urjulc3mkvu8io6d3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEjDFJKeKC0NKKELlTN7vzTymXWmU6cHo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "469122739244-pl52147jre6t6e4urjulc3mkvu8io6d3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
