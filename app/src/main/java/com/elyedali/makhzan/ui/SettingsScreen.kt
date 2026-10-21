@@ -58,6 +58,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import com.elyedali.makhzan.i18n.tr
 
 private val designs = listOf(
     "كلاسيكي (ورقة A4)" to "رأسية بيضاء وجدول بإطارات",
@@ -108,12 +109,12 @@ fun SettingsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPreview: ()
             if (saved != null) {
                 logoPath = saved.first
                 logoBmp = saved.second
-            } else snackbar.showSnackbar("تعذرت قراءة الصورة")
+            } else snackbar.showSnackbar(tr("تعذرت قراءة الصورة"))
         }
     }
 
     suspend fun save(): Boolean {
-        if (name.isBlank()) { snackbar.showSnackbar("اسم المحل مطلوب"); return false }
+        if (name.isBlank()) { snackbar.showSnackbar(tr("اسم المحل مطلوب")); return false }
         dao.updateShopName(shopId, name.trim())
         dao.saveProfile(
             ShopProfile(
@@ -127,7 +128,7 @@ fun SettingsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPreview: ()
     }
 
     Scaffold(
-        topBar = { AppTopBar("إعدادات المحل والفواتير", onBack) },
+        topBar = { AppTopBar(tr("إعدادات المحل والفواتير"), onBack) },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { pad ->
         if (!loaded) return@Scaffold
@@ -135,13 +136,13 @@ fun SettingsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPreview: ()
             Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            SectionTitle("معلومات المحل (تظهر في رأسية الفاتورة)")
-            Field(name, { name = it }, "اسم المحل")
-            Field(address, { address = it }, "الموقع / العنوان")
-            Field(phone, { phone = it }, "رقم الهاتف")
-            Field(email, { email = it }, "معلومات التواصل (واتساب، بريد…)")
-            Field(tax, { tax = it }, "الرقم الضريبي (NIF)")
-            Field(currency, { currency = it }, "العملة (اتركها فارغة للأوقية)")
+            SectionTitle(tr("معلومات المحل (تظهر في رأسية الفاتورة)"))
+            Field(name, { name = it }, tr("اسم المحل"))
+            Field(address, { address = it }, tr("الموقع / العنوان"))
+            Field(phone, { phone = it }, tr("رقم الهاتف"))
+            Field(email, { email = it }, tr("معلومات التواصل (واتساب، بريد…)"))
+            Field(tax, { tax = it }, tr("الرقم الضريبي (NIF)"))
+            Field(currency, { currency = it }, tr("العملة (اتركها فارغة للأوقية)"))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
@@ -149,38 +150,38 @@ fun SettingsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPreview: ()
                     contentAlignment = Alignment.Center,
                 ) {
                     val b = logoBmp
-                    if (b != null) Image(b.asImageBitmap(), contentDescription = "الشعار", modifier = Modifier.fillMaxSize())
-                    else Text("الشعار", style = MaterialTheme.typography.bodySmall)
+                    if (b != null) Image(b.asImageBitmap(), contentDescription = tr("الشعار"), modifier = Modifier.fillMaxSize())
+                    else Text(tr("الشعار"), style = MaterialTheme.typography.bodySmall)
                 }
                 Spacer(Modifier.width(12.dp))
                 Column {
                     OutlinedButton(onClick = { picker.launch("image/*") }) {
-                        Text(if (logoBmp == null) "اختيار شعار المحل" else "تغيير الشعار")
+                        Text(if (logoBmp == null) tr("اختيار شعار المحل") else tr("تغيير الشعار"))
                     }
                     if (logoBmp != null) {
-                        TextButton(onClick = { logoPath = null; logoBmp = null }) { Text("حذف الشعار") }
+                        TextButton(onClick = { logoPath = null; logoBmp = null }) { Text(tr("حذف الشعار")) }
                     }
                 }
             }
 
             HorizontalDivider()
-            SectionTitle("تصميم الفاتورة")
+            SectionTitle(tr("تصميم الفاتورة"))
             designs.forEachIndexed { i, (title, desc) ->
-                Choice(selected = design == i, title = title, desc = desc) { design = i }
+                Choice(selected = design == i, title = tr(title), desc = tr(desc)) { design = i }
             }
 
             HorizontalDivider()
-            SectionTitle("لغة الفاتورة")
+            SectionTitle(tr("لغة الفاتورة"))
             languages.forEach { (code, label) ->
-                Choice(selected = language == code, title = label, desc = null) { language = code }
+                Choice(selected = language == code, title = tr(label), desc = null) { language = code }
             }
 
             HorizontalDivider()
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("طابع المحل على الفاتورة", fontWeight = FontWeight.SemiBold)
+                    Text(tr("طابع المحل على الفاتورة"), fontWeight = FontWeight.SemiBold)
                     Text(
-                        "طابع دائري فيه اسم المحل والرقم الضريبي ورقم الهاتف",
+                        tr("طابع دائري فيه اسم المحل والرقم الضريبي ورقم الهاتف"),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -190,11 +191,11 @@ fun SettingsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPreview: ()
             Spacer(Modifier.size(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(modifier = Modifier.weight(1f), onClick = {
-                    scope.launch { if (save()) snackbar.showSnackbar("تم الحفظ") }
-                }) { Text("حفظ") }
+                    scope.launch { if (save()) snackbar.showSnackbar(tr("تم الحفظ")) }
+                }) { Text(tr("حفظ")) }
                 OutlinedButton(modifier = Modifier.weight(1f), onClick = {
                     scope.launch { if (save()) onPreview() }
-                }) { Text("معاينة الفاتورة") }
+                }) { Text(tr("معاينة الفاتورة")) }
             }
         }
     }

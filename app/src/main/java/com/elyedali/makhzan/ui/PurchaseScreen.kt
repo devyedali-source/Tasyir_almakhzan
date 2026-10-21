@@ -90,7 +90,7 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                     val limit = Plans.limit(shop, now)
                     if (dao.productCount(shopId) + newInCart + 1 > limit) {
                         limitMessage = tr(
-                            "وصل هذا المحل إلى حد %1\$s منتجات.\nلإضافة منتجات جديدة يجب تفعيل المحل أو ترقية الباقة.",
+                            tr("وصل هذا المحل إلى حد %1\$s منتجات.\nلإضافة منتجات جديدة يجب تفعيل المحل أو ترقية الباقة."),
                             Plans.limitText(shop, now),
                         )
                     } else {
@@ -104,7 +104,7 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
     val total = cart.sumOf { it.buyPrice * it.qty }
 
     Scaffold(
-        topBar = { AppTopBar("شراء (إدخال بضاعة)", onBack) },
+        topBar = { AppTopBar(tr("شراء (إدخال بضاعة)"), onBack) },
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             Surface(tonalElevation = 6.dp, shadowElevation = 6.dp) {
@@ -114,7 +114,7 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Column {
-                        Text("مجموع الشراء", style = MaterialTheme.typography.bodySmall)
+                        Text(tr("مجموع الشراء"), style = MaterialTheme.typography.bodySmall)
                         Text(
                             Money.format(total), style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
@@ -129,15 +129,15 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                                 try {
                                     dao.recordPurchase(shopId, items, System.currentTimeMillis())
                                     cart.clear()
-                                    toast("تم تسجيل الشراء: ${Money.format(total)}")
+                                    toast(tr("تم تسجيل الشراء: %1\$s", Money.format(total)))
                                 } catch (e: Exception) {
-                                    toast("تعذر تسجيل الشراء: ${e.message ?: ""}")
+                                    toast(tr("تعذر تسجيل الشراء: %1\$s", e.message ?: ""))
                                 } finally {
                                     busy = false
                                 }
                             }
                         },
-                    ) { Text("تأكيد الشراء") }
+                    ) { Text(tr("تأكيد الشراء")) }
                 }
             }
         },
@@ -153,13 +153,13 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("البضاعة المُدخلة (${cart.size})", style = MaterialTheme.typography.titleMedium)
-                if (cart.isNotEmpty()) TextButton(onClick = { cart.clear() }) { Text("إفراغ") }
+                Text(tr("البضاعة المُدخلة (%1\$s)", cart.size), style = MaterialTheme.typography.titleMedium)
+                if (cart.isNotEmpty()) TextButton(onClick = { cart.clear() }) { Text(tr("إفراغ")) }
             }
             if (cart.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        "امسح الكود بار للمنتج.\nإذا كان جديدًا سيُطلب منك اسمه وأسعاره.",
+                        tr("امسح الكود بار للمنتج.\nإذا كان جديدًا سيُطلب منك اسمه وأسعاره."),
                         textAlign = TextAlign.Center,
                     )
                 }
@@ -171,8 +171,8 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                 ) {
                     items(cart, key = { it.barcode }) { item ->
                         CartRow(
-                            name = if (item.productId == null) "${item.name} (جديد)" else item.name,
-                            subtitle = "شراء ${Money.format(item.buyPrice)} — بيع ${Money.format(item.sellPrice)}",
+                            name = if (item.productId == null) tr("%1\$s (جديد)", item.name) else item.name,
+                            subtitle = tr("شراء %1\$s — بيع %2\$s", Money.format(item.buyPrice), Money.format(item.sellPrice)),
                             lineTotal = Money.format(item.buyPrice * item.qty),
                             qty = item.qty,
                             onPlus = { onScanned(item.barcode) },
@@ -208,7 +208,7 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
     limitMessage?.let { msg ->
         AlertDialog(
             onDismissRequest = { limitMessage = null },
-            title = { Text("حد المنتجات") },
+            title = { Text(tr("حد المنتجات")) },
             text = { Text(msg) },
             confirmButton = {
                 TextButton(onClick = {
@@ -217,9 +217,9 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                         activationShop = dao.shopNow(shopId)
                         activationCount = dao.productCount(shopId)
                     }
-                }) { Text("تفعيل المحل") }
+                }) { Text(tr("تفعيل المحل")) }
             },
-            dismissButton = { TextButton(onClick = { limitMessage = null }) { Text("إغلاق") } },
+            dismissButton = { TextButton(onClick = { limitMessage = null }) { Text(tr("إغلاق")) } },
         )
     }
     activationShop?.let { sh ->
@@ -246,32 +246,32 @@ private fun PurchaseItemDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (isNew) "منتج جديد" else scan.name) },
+        title = { Text(if (isNew) tr("منتج جديد") else scan.name) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("الكود: ${scan.barcode}", style = MaterialTheme.typography.bodySmall)
+                Text(tr("الكود: %1\$s", scan.barcode), style = MaterialTheme.typography.bodySmall)
                 scan.currentStock?.let {
-                    Text("الموجود في المخزون: $it", style = MaterialTheme.typography.bodySmall)
+                    Text(tr("الموجود في المخزون: %1\$s", it), style = MaterialTheme.typography.bodySmall)
                 }
                 if (isNew) {
                     OutlinedTextField(
-                        value = name, onValueChange = { name = it }, label = { Text("اسم المنتج") },
+                        value = name, onValueChange = { name = it }, label = { Text(tr("اسم المنتج")) },
                         singleLine = true, modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                MoneyField(buy, { buy = it }, "سعر الشراء للوحدة")
-                MoneyField(sell, { sell = it }, "سعر البيع للوحدة")
-                NumberField(qty, { qty = it }, "الكمية المشتراة")
+                MoneyField(buy, { buy = it }, tr("سعر الشراء للوحدة"))
+                MoneyField(sell, { sell = it }, tr("سعر البيع للوحدة"))
+                NumberField(qty, { qty = it }, tr("الكمية المشتراة"))
                 if (buyV != null && sellV != null && sellV < buyV) {
-                    ErrorText("تنبيه: سعر البيع أقل من سعر الشراء")
+                    ErrorText(tr("تنبيه: سعر البيع أقل من سعر الشراء"))
                 }
             }
         },
         confirmButton = {
             TextButton(enabled = valid, onClick = { onConfirm(name.trim(), buyV!!, sellV!!, qtyV!!) }) {
-                Text("إضافة")
+                Text(tr("إضافة"))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("إلغاء")) } },
     )
 }

@@ -91,7 +91,7 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("رصيد الصندوق", style = MaterialTheme.typography.titleSmall)
+                    Text(tr("رصيد الصندوق"), style = MaterialTheme.typography.titleSmall)
                     Text(
                         Money.format(balance),
                         style = MaterialTheme.typography.headlineMedium,
@@ -101,11 +101,11 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
                     Spacer(Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
-                            Text("مبيعات اليوم", style = MaterialTheme.typography.bodySmall)
+                            Text(tr("مبيعات اليوم"), style = MaterialTheme.typography.bodySmall)
                             Text(Money.format(salesToday), fontWeight = FontWeight.SemiBold)
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            Text("ربح اليوم", style = MaterialTheme.typography.bodySmall)
+                            Text(tr("ربح اليوم"), style = MaterialTheme.typography.bodySmall)
                             Text(Money.format(profitToday), fontWeight = FontWeight.SemiBold)
                         }
                     }
@@ -128,14 +128,14 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
                             Text(Plans.label(it, now), style = MaterialTheme.typography.bodySmall)
                             if (locked) {
                                 Text(
-                                    "انتهى التفعيل: البيع والشراء متوقفان حتى التجديد. بياناتك محفوظة كاملة.",
+                                    tr("انتهى التفعيل: البيع والشراء متوقفان حتى التجديد. بياناتك محفوظة كاملة."),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.error,
                                 )
                             }
                         }
                         Text(
-                            if (Plans.isActive(it, now)) "تجديد / ترقية" else "تفعيل",
+                            if (Plans.isActive(it, now)) tr("تجديد / ترقية") else tr("تفعيل"),
                             color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold,
                         )
                     }
@@ -143,28 +143,28 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ActionTile("بيع", Icons.Default.PointOfSale, Color(0xFF0B6E4F), Modifier.weight(1f)) {
+                ActionTile(tr("بيع"), Icons.Default.PointOfSale, Color(0xFF0B6E4F), Modifier.weight(1f)) {
                     if (shop?.let { Plans.isLocked(it, count, System.currentTimeMillis()) } == true) showActivation = true
                     else go(Route.Sale(shopId))
                 }
-                ActionTile("شراء (إدخال بضاعة)", Icons.Default.AddShoppingCart, Color(0xFF1565C0), Modifier.weight(1f)) {
+                ActionTile(tr("شراء (إدخال بضاعة)"), Icons.Default.AddShoppingCart, Color(0xFF1565C0), Modifier.weight(1f)) {
                     if (shop?.let { Plans.isLocked(it, count, System.currentTimeMillis()) } == true) showActivation = true
                     else go(Route.Purchase(shopId))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ActionTile("مصاريف", Icons.Default.MoneyOff, Color(0xFFC62828), Modifier.weight(1f)) {
+                ActionTile(tr("مصاريف"), Icons.Default.MoneyOff, Color(0xFFC62828), Modifier.weight(1f)) {
                     showExpense = true
                 }
-                ActionTile("الصندوق", Icons.Default.AccountBalanceWallet, Color(0xFF8A5A00), Modifier.weight(1f)) {
+                ActionTile(tr("الصندوق"), Icons.Default.AccountBalanceWallet, Color(0xFF8A5A00), Modifier.weight(1f)) {
                     go(Route.Cash(shopId))
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ActionTile("المخزون", Icons.Default.Inventory2, Color(0xFF6A1B9A), Modifier.weight(1f)) {
+                ActionTile(tr("المخزون"), Icons.Default.Inventory2, Color(0xFF6A1B9A), Modifier.weight(1f)) {
                     go(Route.Stock(shopId))
                 }
-                ActionTile("الإعدادات والفواتير", Icons.Default.Settings, Color(0xFF455A64), Modifier.weight(1f)) {
+                ActionTile(tr("الإعدادات والفواتير"), Icons.Default.Settings, Color(0xFF455A64), Modifier.weight(1f)) {
                     go(Route.Settings(shopId))
                 }
             }
@@ -188,7 +188,7 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
                             note = note, time = System.currentTimeMillis(),
                         )
                     )
-                    snackbar.showSnackbar("تم تسجيل المصروف")
+                    snackbar.showSnackbar(tr("تم تسجيل المصروف"))
                 }
             },
         )
@@ -222,19 +222,19 @@ private fun ExpenseDialog(onDismiss: () -> Unit, onConfirm: (Long, String) -> Un
     val valid = parsed != null && parsed > 0 && note.isNotBlank()
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("تسجيل مصروف") },
+        title = { Text(tr("تسجيل مصروف")) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                MoneyField(amount, { amount = it }, "المبلغ")
+                MoneyField(amount, { amount = it }, tr("المبلغ"))
                 OutlinedTextField(
-                    value = note, onValueChange = { note = it }, label = { Text("البيان (مثال: كهرباء، كراء…)") },
+                    value = note, onValueChange = { note = it }, label = { Text(tr("البيان (مثال: كهرباء، كراء…)")) },
                     singleLine = true, modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
         confirmButton = {
-            TextButton(enabled = valid, onClick = { onConfirm(parsed!!, note.trim()) }) { Text("حفظ") }
+            TextButton(enabled = valid, onClick = { onConfirm(parsed!!, note.trim()) }) { Text(tr("حفظ")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("إلغاء")) } },
     )
 }

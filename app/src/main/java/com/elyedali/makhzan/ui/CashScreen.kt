@@ -40,6 +40,7 @@ import com.elyedali.makhzan.data.Operation
 import com.elyedali.makhzan.data.OperationLine
 import com.elyedali.makhzan.data.ShopDao
 import kotlinx.coroutines.launch
+import com.elyedali.makhzan.i18n.tr
 
 private val InColor = Color(0xFF0B6E4F)
 private val OutColor = Color(0xFFC62828)
@@ -57,7 +58,7 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
     val ops by remember(from) { dao.operations(shopId, from) }.collectAsState(initial = emptyList())
     var opened by remember { mutableStateOf<Operation?>(null) }
 
-    Scaffold(topBar = { AppTopBar("الصندوق", onBack) }) { pad ->
+    Scaffold(topBar = { AppTopBar(tr("الصندوق"), onBack) }) { pad ->
         LazyColumn(
             Modifier.padding(pad).fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
@@ -69,7 +70,7 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(Modifier.padding(16.dp)) {
-                        Text("الرصيد الحالي للصندوق", style = MaterialTheme.typography.titleSmall)
+                        Text(tr("الرصيد الحالي للصندوق"), style = MaterialTheme.typography.titleSmall)
                         Text(
                             Money.format(balance), style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
@@ -80,25 +81,25 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = todayOnly, onClick = { todayOnly = true }, label = { Text("اليوم") })
-                    FilterChip(selected = !todayOnly, onClick = { todayOnly = false }, label = { Text("كل الفترات") })
+                    FilterChip(selected = todayOnly, onClick = { todayOnly = true }, label = { Text(tr("اليوم")) })
+                    FilterChip(selected = !todayOnly, onClick = { todayOnly = false }, label = { Text(tr("كل الفترات")) })
                 }
             }
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SummaryRow("المبيعات", sales, InColor)
-                        SummaryRow("المشتريات", purchases, OutColor)
-                        SummaryRow("المصاريف", expenses, OutColor)
-                        SummaryRow("الربح من المبيعات", profit, InColor)
+                        SummaryRow(tr("المبيعات"), sales, InColor)
+                        SummaryRow(tr("المشتريات"), purchases, OutColor)
+                        SummaryRow(tr("المصاريف"), expenses, OutColor)
+                        SummaryRow(tr("الربح من المبيعات"), profit, InColor)
                     }
                 }
             }
             item {
-                Text("حركة الصندوق", style = MaterialTheme.typography.titleMedium)
+                Text(tr("حركة الصندوق"), style = MaterialTheme.typography.titleMedium)
             }
             if (ops.isEmpty()) {
-                item { Text("لا توجد عمليات في هذه الفترة") }
+                item { Text(tr("لا توجد عمليات في هذه الفترة")) }
             }
             items(ops, key = { it.id }) { op ->
                 val isIn = op.type == OpType.SALE
@@ -160,25 +161,25 @@ private fun OperationLinesDialog(dao: ShopDao, op: Operation, onDismiss: () -> U
                 }
                 Spacer(Modifier.height(6.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("المجموع", fontWeight = FontWeight.Bold)
+                    Text(tr("المجموع"), fontWeight = FontWeight.Bold)
                     Text(Money.format(op.total), fontWeight = FontWeight.Bold)
                 }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 TextButton(onClick = { confirmCancel = true }) {
-                    Text("إلغاء هذه العملية", color = MaterialTheme.colorScheme.error)
+                    Text(tr("إلغاء هذه العملية"), color = MaterialTheme.colorScheme.error)
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("إغلاق") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(tr("إغلاق")) } },
         dismissButton = {
-            if (op.type == OpType.SALE) TextButton(onClick = onInvoice) { Text("الفاتورة") }
+            if (op.type == OpType.SALE) TextButton(onClick = onInvoice) { Text(tr("الفاتورة")) }
         },
     )
     if (confirmCancel) {
         AlertDialog(
             onDismissRequest = { confirmCancel = false },
-            title = { Text("إلغاء العملية") },
-            text = { Text("ستُحذف هذه العملية ويعود المخزون والصندوق كما كانا قبلها. هل تريد المتابعة؟") },
+            title = { Text(tr("إلغاء العملية")) },
+            text = { Text(tr("ستُحذف هذه العملية ويعود المخزون والصندوق كما كانا قبلها. هل تريد المتابعة؟")) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmCancel = false
@@ -190,9 +191,9 @@ private fun OperationLinesDialog(dao: ShopDao, op: Operation, onDismiss: () -> U
                             error = e.message
                         }
                     }
-                }) { Text("نعم، إلغاء العملية", color = MaterialTheme.colorScheme.error) }
+                }) { Text(tr("نعم، إلغاء العملية"), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { confirmCancel = false }) { Text("تراجع") } },
+            dismissButton = { TextButton(onClick = { confirmCancel = false }) { Text(tr("تراجع")) } },
         )
     }
 }

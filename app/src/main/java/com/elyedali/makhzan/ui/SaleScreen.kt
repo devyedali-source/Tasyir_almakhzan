@@ -44,6 +44,7 @@ import com.elyedali.makhzan.data.Product
 import com.elyedali.makhzan.data.SaleItem
 import com.elyedali.makhzan.data.ShopDao
 import kotlinx.coroutines.launch
+import com.elyedali.makhzan.i18n.tr
 
 private data class SaleCartLine(val product: Product, val qty: Int)
 
@@ -67,7 +68,7 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
         val newQty = current + delta
         when {
             newQty <= 0 -> if (i >= 0) cart.removeAt(i)
-            newQty > product.qty -> toast("الكمية المتوفرة من «${product.name}» هي ${product.qty} فقط")
+            newQty > product.qty -> toast(tr("الكمية المتوفرة من «%1\$s» هي %2\$s فقط", product.name, product.qty))
             i >= 0 -> cart[i] = cart[i].copy(product = product, qty = newQty)
             else -> cart.add(0, SaleCartLine(product, newQty))
         }
@@ -76,7 +77,7 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
     val total = cart.sumOf { it.product.sellPrice * it.qty }
 
     Scaffold(
-        topBar = { AppTopBar("بيع", onBack) },
+        topBar = { AppTopBar(tr("بيع"), onBack) },
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             Surface(tonalElevation = 6.dp, shadowElevation = 6.dp) {
@@ -86,7 +87,7 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Column {
-                        Text("المجموع", style = MaterialTheme.typography.bodySmall)
+                        Text(tr("المجموع"), style = MaterialTheme.typography.bodySmall)
                         Text(
                             Money.format(total), style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
@@ -110,19 +111,19 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                                     busy = false
                                     snackbar.currentSnackbarData?.dismiss()
                                     val r = snackbar.showSnackbar(
-                                        message = "تم تسجيل البيع: ${Money.format(total)}",
-                                        actionLabel = "الفاتورة",
+                                        message = tr("تم تسجيل البيع: %1\$s", Money.format(total)),
+                                        actionLabel = tr("الفاتورة"),
                                         duration = SnackbarDuration.Long,
                                     )
                                     if (r == SnackbarResult.ActionPerformed) onInvoice(opId)
                                 } catch (e: IllegalStateException) {
-                                    toast(e.message ?: "تعذر تسجيل البيع")
+                                    toast(e.message ?: tr("تعذر تسجيل البيع"))
                                 } finally {
                                     busy = false
                                 }
                             }
                         },
-                    ) { Text("تأكيد البيع") }
+                    ) { Text(tr("تأكيد البيع")) }
                 }
             }
         },
@@ -134,7 +135,7 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                 onCode = { code ->
                     scope.launch {
                         val p = dao.findByBarcode(shopId, code)
-                        if (p == null) toast("هذا المنتج غير مسجل. سجّله أولًا من شاشة الشراء.")
+                        if (p == null) toast(tr("هذا المنتج غير مسجل. سجّله أولًا من شاشة الشراء."))
                         else changeQty(p, +1)
                     }
                 },
@@ -144,12 +145,12 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("السلة (${cart.sumOf { it.qty }})", style = MaterialTheme.typography.titleMedium)
-                if (cart.isNotEmpty()) TextButton(onClick = { cart.clear() }) { Text("إفراغ السلة") }
+                Text(tr("السلة (%1\$s)", cart.sumOf { it.qty }), style = MaterialTheme.typography.titleMedium)
+                if (cart.isNotEmpty()) TextButton(onClick = { cart.clear() }) { Text(tr("إفراغ السلة")) }
             }
             if (cart.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("وجّه الكاميرا نحو الكود بار لإضافة المنتج", textAlign = TextAlign.Center)
+                    Text(tr("وجّه الكاميرا نحو الكود بار لإضافة المنتج"), textAlign = TextAlign.Center)
                 }
             } else {
                 LazyColumn(
@@ -189,10 +190,10 @@ fun CartRow(
                 Text(subtitle, style = MaterialTheme.typography.bodySmall)
                 Text(lineTotal, fontWeight = FontWeight.SemiBold)
             }
-            IconButton(onClick = onMinus) { Icon(Icons.Default.Remove, contentDescription = "إنقاص") }
+            IconButton(onClick = onMinus) { Icon(Icons.Default.Remove, contentDescription = tr("إنقاص")) }
             Text("$qty", style = MaterialTheme.typography.titleMedium)
             if (onPlus != null) {
-                IconButton(onClick = onPlus) { Icon(Icons.Default.Add, contentDescription = "زيادة") }
+                IconButton(onClick = onPlus) { Icon(Icons.Default.Add, contentDescription = tr("زيادة")) }
             }
         }
     }

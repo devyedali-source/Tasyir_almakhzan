@@ -44,6 +44,7 @@ import com.elyedali.makhzan.data.Shop
 import com.elyedali.makhzan.data.ShopDao
 import kotlinx.coroutines.launch
 import java.util.UUID
+import com.elyedali.makhzan.i18n.tr
 
 @Composable
 fun ShopsScreen(dao: ShopDao, onOpen: (Long) -> Unit, driveOk: Boolean, requestDrive: () -> Unit) {
@@ -56,16 +57,16 @@ fun ShopsScreen(dao: ShopDao, onOpen: (Long) -> Unit, driveOk: Boolean, requestD
 
     Scaffold(
         topBar = {
-            AppTopBar("محلاتي التجارية", actions = {
-                IconButton(onClick = { showLang = true }) { Icon(Icons.Default.Language, contentDescription = "لغة التطبيق") }
-                IconButton(onClick = { showAccount = true }) { Icon(Icons.Default.AccountCircle, contentDescription = "حسابي") }
+            AppTopBar(tr("محلاتي التجارية"), actions = {
+                IconButton(onClick = { showLang = true }) { Icon(Icons.Default.Language, contentDescription = tr("لغة التطبيق")) }
+                IconButton(onClick = { showAccount = true }) { Icon(Icons.Default.AccountCircle, contentDescription = tr("حسابي")) }
             })
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAdd = true },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("إنشاء محل تجاري") },
+                text = { Text(tr("إنشاء محل تجاري")) },
             )
         },
     ) { pad ->
@@ -79,17 +80,17 @@ fun ShopsScreen(dao: ShopDao, onOpen: (Long) -> Unit, driveOk: Boolean, requestD
                     Icon(Icons.Default.CloudOff, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "الحفظ التلقائي على Google Drive غير مفعّل بعد",
+                        tr("الحفظ التلقائي على Google Drive غير مفعّل بعد"),
                         modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
                     )
-                    TextButton(onClick = requestDrive) { Text("تفعيل الآن") }
+                    TextButton(onClick = requestDrive) { Text(tr("تفعيل الآن")) }
                 }
             }
         }
         if (shops.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    "لا توجد محلات بعد.\nاضغط «إنشاء محل تجاري» للبدء.",
+                    tr("لا توجد محلات بعد.\nاضغط «إنشاء محل تجاري» للبدء."),
                     textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge,
                 )
             }
@@ -124,9 +125,9 @@ fun ShopsScreen(dao: ShopDao, onOpen: (Long) -> Unit, driveOk: Boolean, requestD
 
     if (showAdd) {
         TextInputDialog(
-            title = "محل تجاري جديد",
-            label = "اسم المحل",
-            confirmText = "إنشاء",
+            title = tr("محل تجاري جديد"),
+            label = tr("اسم المحل"),
+            confirmText = tr("إنشاء"),
             onDismiss = { showAdd = false },
             onConfirm = { name ->
                 showAdd = false

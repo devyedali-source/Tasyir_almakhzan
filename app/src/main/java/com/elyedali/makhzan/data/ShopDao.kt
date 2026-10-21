@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import com.elyedali.makhzan.i18n.tr
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -127,9 +128,9 @@ abstract class ShopDao {
         require(items.isNotEmpty())
         for (item in items) {
             val p = productNow(item.productId)
-                ?: throw IllegalStateException("منتج غير موجود: ${item.name}")
+                ?: throw IllegalStateException(tr("منتج غير موجود: %1\$s", item.name))
             if (p.qty < item.qty) {
-                throw IllegalStateException("الكمية المتوفرة من «${p.name}» هي ${p.qty} فقط")
+                throw IllegalStateException(tr("الكمية المتوفرة من «%1\$s» هي %2\$s فقط", p.name, p.qty))
             }
         }
         val total = items.sumOf { it.unitPrice * it.qty }
@@ -200,7 +201,7 @@ abstract class ShopDao {
                     val p = productNow(l.productId)
                     if (p == null || p.qty < l.qty) {
                         throw IllegalStateException(
-                            "لا يمكن إلغاء هذا الشراء: بيع جزء من «${l.productName}» بعده"
+                            tr("لا يمكن إلغاء هذا الشراء: بيع جزء من «%1\$s» بعده", l.productName)
                         )
                     }
                 }

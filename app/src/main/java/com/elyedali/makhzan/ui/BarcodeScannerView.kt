@@ -44,6 +44,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
+import com.elyedali.makhzan.i18n.tr
 
 /**
  * كاميرا تقرأ الكود بار باستمرار. نفس الكود لا يُقرأ مرة ثانية إلا بعد إبعاده عن الكاميرا قليلًا.
@@ -74,13 +75,13 @@ fun BarcodeScannerView(
         Box(modifier.background(Color(0xFF1B1B1B), shape), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    "يحتاج التطبيق إلى الكاميرا لقراءة الكود بار",
+                    tr("يحتاج التطبيق إلى الكاميرا لقراءة الكود بار"),
                     color = Color.White, textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
                 Spacer(Modifier.height(12.dp))
                 Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) {
-                    Text("السماح باستعمال الكاميرا")
+                    Text(tr("السماح باستعمال الكاميرا"))
                 }
             }
         }

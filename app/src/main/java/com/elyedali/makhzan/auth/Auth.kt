@@ -8,6 +8,7 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.NoCredentialException
 import com.elyedali.makhzan.R
+import com.elyedali.makhzan.i18n.tr
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
@@ -38,14 +39,14 @@ object Auth {
                 auth.signInWithCredential(GoogleAuthProvider.getCredential(google.idToken, null)).await()
                 null
             } else {
-                "نوع الحساب غير مدعوم"
+                tr("نوع الحساب غير مدعوم")
             }
         } catch (e: GetCredentialCancellationException) {
-            "تم إلغاء تسجيل الدخول"
+            tr("تم إلغاء تسجيل الدخول")
         } catch (e: NoCredentialException) {
-            "لا يوجد حساب Google على هذا الهاتف"
+            tr("لا يوجد حساب Google على هذا الهاتف")
         } catch (e: Exception) {
-            "تعذر تسجيل الدخول. تأكد من الاتصال بالإنترنت.\n(${e.javaClass.simpleName}: ${e.message ?: ""})"
+            tr("تعذر تسجيل الدخول. تأكد من الاتصال بالإنترنت.") + "\n(${e.javaClass.simpleName}: ${e.message ?: ""})"
         }
     }
 

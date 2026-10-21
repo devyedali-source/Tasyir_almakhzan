@@ -58,6 +58,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import com.elyedali.makhzan.i18n.tr
 
 /**
  * عرض الفاتورة مع المشاركة والطباعة.
@@ -86,12 +87,12 @@ fun InvoiceScreen(dao: ShopDao, shopId: Long, opId: Long?, onBack: () -> Unit) {
             pages = withContext(Dispatchers.IO) { renderPages(f) }
             file = f
         } catch (e: Exception) {
-            error = "تعذر إنشاء الفاتورة: ${e.message ?: ""}"
+            error = tr("تعذر إنشاء الفاتورة: %1\$s", e.message ?: "")
         }
     }
 
     Scaffold(
-        topBar = { AppTopBar(if (opId == null) "معاينة تصميم الفاتورة" else "فاتورة رقم $opId", onBack) },
+        topBar = { AppTopBar(if (opId == null) tr("معاينة تصميم الفاتورة") else tr("فاتورة رقم %1\$s", opId), onBack) },
         bottomBar = {
             val f = file
             if (f != null) {
@@ -102,11 +103,11 @@ fun InvoiceScreen(dao: ShopDao, shopId: Long, opId: Long?, onBack: () -> Unit) {
                     ) {
                         Button(onClick = { share(context, f) }, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Share, contentDescription = null)
-                            Text("  مشاركة")
+                            Text(tr("  مشاركة"))
                         }
                         OutlinedButton(onClick = { print(context, f) }, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Print, contentDescription = null)
-                            Text("  طباعة")
+                            Text(tr("  طباعة"))
                         }
                     }
                 }
@@ -143,9 +144,9 @@ private fun sampleInvoice() = InvoiceData(
     number = 1,
     time = System.currentTimeMillis(),
     lines = listOf(
-        InvoiceLine("حليب مجفف 400غ", 2, 15000),
-        InvoiceLine("سكر 1 كغ", 1, 4500),
-        InvoiceLine("شاي أخضر", 3, 2000),
+        InvoiceLine(tr("حليب مجفف 400غ"), 2, 15000),
+        InvoiceLine(tr("سكر 1 كغ"), 1, 4500),
+        InvoiceLine(tr("شاي أخضر"), 3, 2000),
     ),
 )
 
@@ -174,7 +175,7 @@ private fun share(context: Context, file: File) {
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    context.startActivity(Intent.createChooser(intent, "مشاركة الفاتورة"))
+    context.startActivity(Intent.createChooser(intent, tr("مشاركة الفاتورة")))
 }
 
 private fun print(context: Context, file: File) {

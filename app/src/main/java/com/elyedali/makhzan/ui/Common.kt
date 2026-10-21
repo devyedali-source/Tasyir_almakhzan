@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.elyedali.makhzan.i18n.tr
 
 @Composable
 fun AppTopBar(title: String, onBack: (() -> Unit)? = null, actions: @Composable RowScope.() -> Unit = {}) {
@@ -37,7 +38,7 @@ fun AppTopBar(title: String, onBack: (() -> Unit)? = null, actions: @Composable 
             if (onBack != null) {
                 IconButton(onClick = onBack) {
                     // يُقلب السهم تلقائيًا في الاتجاه من اليمين إلى اليسار
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "رجوع")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = tr("رجوع"))
                 }
             }
         },
@@ -74,7 +75,7 @@ fun TextInputDialog(
     title: String,
     label: String,
     initial: String = "",
-    confirmText: String = "حفظ",
+    confirmText: String = tr("حفظ"),
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
@@ -91,7 +92,7 @@ fun TextInputDialog(
         confirmButton = {
             TextButton(enabled = text.isNotBlank(), onClick = { onConfirm(text.trim()) }) { Text(confirmText) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("إلغاء")) } },
     )
 }
 
@@ -101,7 +102,7 @@ fun InfoDialog(title: String, message: String, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(message) },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("حسنًا") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(tr("حسنًا")) } },
     )
 }
 

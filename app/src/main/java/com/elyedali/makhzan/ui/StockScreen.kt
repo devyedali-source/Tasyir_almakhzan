@@ -40,6 +40,7 @@ import com.elyedali.makhzan.data.Money
 import com.elyedali.makhzan.data.OpType
 import com.elyedali.makhzan.data.ShopDao
 import kotlinx.coroutines.launch
+import com.elyedali.makhzan.i18n.tr
 
 @Composable
 fun StockScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onOpen: (Long) -> Unit) {
@@ -50,7 +51,7 @@ fun StockScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onOpen: (Long) -
         it.name.contains(query.trim(), ignoreCase = true) || it.barcode.contains(query.trim())
     }
 
-    Scaffold(topBar = { AppTopBar("المخزون", onBack) }) { pad ->
+    Scaffold(topBar = { AppTopBar(tr("المخزون"), onBack) }) { pad ->
         LazyColumn(
             Modifier.padding(pad).fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
@@ -66,11 +67,11 @@ fun StockScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onOpen: (Long) -
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Column {
-                            Text("عدد المنتجات", style = MaterialTheme.typography.bodySmall)
+                            Text(tr("عدد المنتجات"), style = MaterialTheme.typography.bodySmall)
                             Text("${products.size}", fontWeight = FontWeight.Bold)
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            Text("قيمة المخزون (بسعر الشراء)", style = MaterialTheme.typography.bodySmall)
+                            Text(tr("قيمة المخزون (بسعر الشراء)"), style = MaterialTheme.typography.bodySmall)
                             Text(Money.format(value), fontWeight = FontWeight.Bold)
                         }
                     }
@@ -80,19 +81,19 @@ fun StockScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onOpen: (Long) -
                 OutlinedTextField(
                     value = query, onValueChange = { query = it },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    label = { Text("بحث بالاسم") }, singleLine = true,
+                    label = { Text(tr("بحث بالاسم")) }, singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
             if (products.isEmpty()) {
-                item { Text("لا توجد منتجات بعد. أدخل البضاعة من شاشة الشراء.") }
+                item { Text(tr("لا توجد منتجات بعد. أدخل البضاعة من شاشة الشراء.")) }
             }
             items(shown, key = { it.id }) { p ->
                 Card(onClick = { onOpen(p.id) }, modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(p.name, style = MaterialTheme.typography.titleSmall)
-                            Text("سعر البيع: ${Money.format(p.sellPrice)}", style = MaterialTheme.typography.bodySmall)
+                            Text(tr("سعر البيع: %1\$s", Money.format(p.sellPrice)), style = MaterialTheme.typography.bodySmall)
                         }
                         Spacer(Modifier.width(8.dp))
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -100,7 +101,7 @@ fun StockScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onOpen: (Long) -
                                 "${p.qty}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
                                 color = if (p.qty <= 0) Color(0xFFC62828) else MaterialTheme.colorScheme.onSurface,
                             )
-                            Text("الكمية", style = MaterialTheme.typography.bodySmall)
+                            Text(tr("الكمية"), style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -126,28 +127,28 @@ fun ProductDetailScreen(dao: ShopDao, productId: Long, onBack: () -> Unit) {
                 item {
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("الكود: ${p.barcode}")
-                            Text("الكمية في المخزون: ${p.qty}", fontWeight = FontWeight.Bold)
-                            Text("سعر الشراء: ${Money.format(p.buyPrice)}")
-                            Text("سعر البيع: ${Money.format(p.sellPrice)}")
-                            OutlinedButton(onClick = { editing = true }) { Text("تعديل الاسم وسعر البيع") }
+                            Text(tr("الكود: %1\$s", p.barcode))
+                            Text(tr("الكمية في المخزون: %1\$s", p.qty), fontWeight = FontWeight.Bold)
+                            Text(tr("سعر الشراء: %1\$s", Money.format(p.buyPrice)))
+                            Text(tr("سعر البيع: %1\$s", Money.format(p.sellPrice)))
+                            OutlinedButton(onClick = { editing = true }) { Text(tr("تعديل الاسم وسعر البيع")) }
                         }
                     }
                 }
             }
-            item { Text("حركة المخزون", style = MaterialTheme.typography.titleMedium) }
-            if (moves.isEmpty()) item { Text("لا توجد حركات") }
+            item { Text(tr("حركة المخزون"), style = MaterialTheme.typography.titleMedium) }
+            if (moves.isEmpty()) item { Text(tr("لا توجد حركات")) }
             items(moves, key = { it.line.id }) { m ->
                 val isIn = m.type == OpType.PURCHASE
                 Card(Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                if (isIn) "دخول (شراء)" else "خروج (بيع)",
+                                if (isIn) tr("دخول (شراء)") else tr("خروج (بيع)"),
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             Text(
-                                "${Dates.format(m.time)} — ${Money.format(m.line.unitPrice)} للوحدة",
+                                tr("%1\$s — %2\$s للوحدة", Dates.format(m.time), Money.format(m.line.unitPrice)),
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
@@ -169,23 +170,23 @@ fun ProductDetailScreen(dao: ShopDao, productId: Long, onBack: () -> Unit) {
         val sellV = Money.parse(sell)
         AlertDialog(
             onDismissRequest = { editing = false },
-            title = { Text("تعديل المنتج") },
+            title = { Text(tr("تعديل المنتج")) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
-                        value = name, onValueChange = { name = it }, label = { Text("اسم المنتج") },
+                        value = name, onValueChange = { name = it }, label = { Text(tr("اسم المنتج")) },
                         singleLine = true, modifier = Modifier.fillMaxWidth(),
                     )
-                    MoneyField(sell, { sell = it }, "سعر البيع للوحدة")
+                    MoneyField(sell, { sell = it }, tr("سعر البيع للوحدة"))
                 }
             },
             confirmButton = {
                 TextButton(enabled = name.isNotBlank() && sellV != null, onClick = {
                     editing = false
                     scope.launch { dao.updateNameAndSellPrice(p.id, name.trim(), sellV!!) }
-                }) { Text("حفظ") }
+                }) { Text(tr("حفظ")) }
             },
-            dismissButton = { TextButton(onClick = { editing = false }) { Text("إلغاء") } },
+            dismissButton = { TextButton(onClick = { editing = false }) { Text(tr("إلغاء")) } },
         )
     }
 }

@@ -71,7 +71,7 @@ fun LoginScreen() {
                 busy = true
                 error = null
                 scope.launch {
-                    error = Auth.signInWithGoogle(activity)?.let { tr(it) }
+                    error = Auth.signInWithGoogle(activity)
                     busy = false
                 }
             }, modifier = Modifier.fillMaxWidth()) { Text(tr("تسجيل الدخول بحساب Google")) }
