@@ -1,6 +1,9 @@
 package com.elyedali.makhzan.activation
 
+import android.content.Context
 import android.content.Intent
+import android.telephony.TelephonyManager
+import java.util.Locale
 import android.net.Uri
 import com.elyedali.makhzan.auth.Auth
 import com.elyedali.makhzan.data.Shop
@@ -165,5 +168,45 @@ object Activation {
             )
             newExp
         }.await()
+    }
+
+    /**
+     * تفعيل بعد دفع ناجح عبر Google Play: يكتبه صاحب المحل نفسه (قواعد الخادم تسمح له بذلك
+     * فقط مع رمز شراء جديد ومدة لا تتجاوز 4 أشهر). يُرجع تاريخ الانتهاء الجديد.
+     */
+    suspend fun ownerActivateFromPurchase(shopRemoteId: String, shopName: String, tier: Int, purchaseToken: String): Long {
+        val user = Auth.auth.currentUser ?: throw IllegalStateException("not signed in")
+        val ref = doc(shopRemoteId)
+        return FirebaseFirestore.getInstance().runTransaction { tx ->
+            val snap = tx.get(ref)
+            val now = System.currentTimeMillis()
+            val curTier = (snap.getLong("tier") ?: 0L).toInt()
+            val curExp = snap.getLong("expiresAt") ?: 0L
+            // نفس الشراء طُبّق من قبل (مثلًا انقطع الاتصال قبل الاستهلاك)
+            if (snap.getString("lastPurchaseToken") == purchaseToken) return@runTransaction curExp
+            val base = if (curTier == tier && curExp > now) curExp else now
+            val newExp = addMonths(base, MONTHS)
+            tx.set(
+                ref,
+                mapOf(
+                    "ownerUid" to user.uid,
+                    "ownerEmail" to (user.email ?: ""),
+                    "shopName" to shopName,
+                    "tier" to tier,
+                    "expiresAt" to newExp,
+                    "updatedAt" to FieldValue.serverTimestamp(),
+                    "lastPurchaseToken" to purchaseToken,
+                    "source" to "play",
+                ),
+            )
+            newExp
+        }.await()
+    }
+
+    /** الدفع عبر واتساب متاح لمستخدمي موريتانيا (حسب شريحة الهاتف أو الشبكة أو إعدادات اللغة) */
+    fun isMauritania(context: Context): Boolean {
+        val tm = context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
+        val codes = listOfNotNull(tm?.simCountryIso, tm?.networkCountryIso, Locale.getDefault().country)
+        return codes.any { it.equals("mr", ignoreCase = true) }
     }
 }

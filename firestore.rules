@@ -8,11 +8,30 @@ service cloud.firestore {
         && request.auth.token.email_verified == true;
     }
 
-    // وثيقة تفعيل لكل محل: يقرؤها صاحبها فقط، ويكتبها المسؤول وحده
+    // صاحب المحل يكتب تفعيله بنفسه فقط بعد دفع عبر Google Play:
+    // رمز شراء جديد في كل مرة، باقة صحيحة، ومدة لا تتجاوز 4 أشهر بعد نهاية التفعيل الحالي.
+    function ownerPlayPurchase() {
+      let d = request.resource.data;
+      let nowMs = request.time.toMillis();
+      let base = (resource != null && resource.data.expiresAt > nowMs) ? resource.data.expiresAt : nowMs;
+      return request.auth != null
+        && d.ownerUid == request.auth.uid
+        && (resource == null || resource.data.ownerUid == request.auth.uid)
+        && d.tier in [1, 2, 3]
+        && d.expiresAt is int
+        && d.expiresAt <= base + 10800000000
+        && d.source == "play"
+        && d.lastPurchaseToken is string
+        && d.lastPurchaseToken.size() > 20
+        && (resource == null || resource.data.get("lastPurchaseToken", "") != d.lastPurchaseToken)
+        && d.keys().hasOnly(["ownerUid", "ownerEmail", "shopName", "tier", "expiresAt", "updatedAt", "lastPurchaseToken", "source"]);
+    }
+
+    // وثيقة تفعيل لكل محل: يقرؤها صاحبها فقط
     match /shops/{shopId} {
       allow read: if request.auth != null
         && (resource == null || resource.data.ownerUid == request.auth.uid || isAdmin());
-      allow write: if isAdmin();
+      allow write: if isAdmin() || ownerPlayPurchase();
     }
 
     // كل ما عدا ذلك ممنوع

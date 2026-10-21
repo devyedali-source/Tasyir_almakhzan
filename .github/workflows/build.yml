@@ -37,7 +37,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           set -o pipefail
-          ./gradlew assembleRelease --no-daemon 2>&1 | tee build.log || {
+          ./gradlew assembleRelease bundleRelease --no-daemon 2>&1 | tee build.log || {
             grep -E "^e: |error:|What went wrong" -A2 build.log | head -40 | while IFS= read -r line; do echo "::error::$line"; done
             exit 1
           }
@@ -50,3 +50,9 @@ jobs:
         with:
           name: makhzan-apk
           path: app/build/outputs/apk/release/*.apk
+
+      - name: Upload AAB (for Google Play)
+        uses: actions/upload-artifact@v4
+        with:
+          name: makhzan-aab
+          path: app/build/outputs/bundle/release/*.aab

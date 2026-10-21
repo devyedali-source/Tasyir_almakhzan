@@ -89,7 +89,17 @@ object Plans {
 
     fun isActive(shop: Shop, now: Long) = shop.tier > 0 && shop.expiresAt > now
 
-    fun limit(shop: Shop, now: Long): Int = if (!isActive(shop, now)) FREE_LIMIT else when (shop.tier) {
+    /**
+     * محل مجاني واحد لكل حساب: أول محل أنشأه المستخدم (حتى 9 منتجات).
+     * باقي المحلات تحتاج تفعيلًا من أول منتج، حتى لا يتهرب أحد بفتح محلات مجانية كثيرة.
+     */
+    var freeShopId by mutableStateOf<Long?>(null)
+
+    fun isFreeShop(shop: Shop) = freeShopId == null || shop.id == freeShopId
+
+    fun freeLimit(shop: Shop) = if (isFreeShop(shop)) FREE_LIMIT else 0
+
+    fun limit(shop: Shop, now: Long): Int = if (!isActive(shop, now)) freeLimit(shop) else when (shop.tier) {
         1 -> 50
         2 -> 100
         else -> Int.MAX_VALUE
@@ -105,7 +115,7 @@ object Plans {
      * يُمنع البيع والشراء حتى التجديد، وتبقى التقارير والبيانات كاملة.
      */
     fun isLocked(shop: Shop, productCount: Int, now: Long) =
-        productCount > FREE_LIMIT && !isActive(shop, now)
+        productCount > freeLimit(shop) && !isActive(shop, now)
 
     /** أقل باقة تتسع لمنتج إضافي واحد على الأقل */
     fun neededTier(productCount: Int): Int = when {
@@ -124,5 +134,6 @@ object Plans {
     fun label(shop: Shop, now: Long): String =
         if (isActive(shop, now)) tr("مفعّل حتى %1\$s", Dates.formatDay(shop.expiresAt))
         else if (shop.tier > 0) tr("انتهى التفعيل في %1\$s", Dates.formatDay(shop.expiresAt))
-        else tr("مجاني (أقل من 10 منتجات)")
+        else if (isFreeShop(shop)) tr("مجاني (أقل من 10 منتجات)")
+        else tr("غير مفعّل (المحل المجاني هو أول محل لك فقط)")
 }

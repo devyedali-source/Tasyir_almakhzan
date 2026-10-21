@@ -3,6 +3,8 @@ package com.elyedali.makhzan
 import android.app.Application
 import androidx.room.InvalidationTracker
 import com.elyedali.makhzan.backup.DriveBackup
+import com.elyedali.makhzan.billing.PlayBilling
+import com.google.firebase.auth.FirebaseAuth
 import com.elyedali.makhzan.data.AppDatabase
 import com.elyedali.makhzan.i18n.I18n
 import kotlinx.coroutines.CoroutineScope
@@ -17,6 +19,9 @@ class MakhzanApp : Application() {
     override fun onCreate() {
         super.onCreate()
         I18n.init(this)
+        PlayBilling.init(this)
+        // مشتريات دُفعت ولم يُكتب تفعيلها بعد (انقطاع الاتصال): تُعالج عند كل دخول
+        FirebaseAuth.getInstance().addAuthStateListener { if (it.currentUser != null) PlayBilling.processPending() }
         val db = AppDatabase.get(this)
 
         // كل تغيير في البيانات يطلب نسخة احتياطية في الخلفية على Drive

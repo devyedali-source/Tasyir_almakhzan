@@ -50,6 +50,7 @@ import com.elyedali.makhzan.backup.DriveAccess
 import com.elyedali.makhzan.backup.DriveBackup
 import com.elyedali.makhzan.data.AppDatabase
 import com.elyedali.makhzan.data.Money
+import com.elyedali.makhzan.data.Plans
 import com.elyedali.makhzan.data.Prefs
 import com.elyedali.makhzan.data.ShopDao
 import com.elyedali.makhzan.i18n.I18n
@@ -331,6 +332,9 @@ private fun AppRoot(
         if (req != null) go(Route.AdminActivate(req))
         if (deepLink != null) onDeepLinkConsumed()
     }
+
+    // المحل المجاني الوحيد لهذا الحساب
+    LaunchedEffect(Unit) { dao.firstShopId().collect { Plans.freeShopId = it } }
 
     // عملة المحل المفتوح
     val currentShop = stack.lastOrNull { it.shopId() != null }?.shopId()

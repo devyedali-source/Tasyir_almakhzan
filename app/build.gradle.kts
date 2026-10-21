@@ -14,8 +14,8 @@ android {
         applicationId = "com.elyedali.makhzan"
         minSdk = 24
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4"
+        versionCode = 5
+        versionName = "0.5"
     }
 
     // مفتاح التوقيع الثابت: يأتي من أسرار GitHub (KEYSTORE_BASE64 و KEYSTORE_PASSWORD)
@@ -91,6 +91,9 @@ dependencies {
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     implementation("com.google.android.gms:play-services-auth:21.2.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+
+    // الدفع بالبطاقة البنكية عبر Google Play
+    implementation("com.android.billingclient:billing-ktx:7.1.1")
 
     // النسخ الاحتياطي في الخلفية على Google Drive
     implementation("androidx.work:work-runtime-ktx:2.9.1")

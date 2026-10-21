@@ -1,5 +1,6 @@
 package com.elyedali.makhzan.ui
 
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -39,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import com.elyedali.makhzan.activation.Activation
 import com.elyedali.makhzan.activation.ActivationRequest
 import com.elyedali.makhzan.auth.Auth
+import com.elyedali.makhzan.billing.PlayBilling
 import com.elyedali.makhzan.data.Dates
 import com.elyedali.makhzan.data.Plans
 import com.elyedali.makhzan.data.Shop
@@ -60,6 +63,13 @@ fun ActivationDialog(dao: ShopDao, shop: Shop, productCount: Int, onDismiss: () 
     var current by remember { mutableStateOf(shop) }
     var checking by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf<String?>(null) }
+    var paying by remember { mutableStateOf(false) }
+    val activity = context as Activity
+    val mauritania = remember { Activation.isMauritania(context) }
+    LaunchedEffect(Unit) {
+        PlayBilling.status = null
+        PlayBilling.loadPrices()
+    }
 
     // ضمان وجود معرّف المحل على الخادم
     LaunchedEffect(shop.id) {
@@ -108,28 +118,63 @@ fun ActivationDialog(dao: ShopDao, shop: Shop, productCount: Int, onDismiss: () 
                             RadioButton(selected = tier == p.tier, enabled = enabled, onClick = { tier = p.tier })
                             Column {
                                 Text(tr(p.label), fontWeight = FontWeight.SemiBold)
-                                Text(tr("%1\$s أوقية", p.price), style = MaterialTheme.typography.bodySmall)
+                                Text(
+                                    PlayBilling.prices[p.tier]?.takeIf { !mauritania } ?: tr("%1\$s أوقية", p.price),
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
                             }
                         }
                     }
                 }
+                // طرق الدفع
+                Button(
+                    enabled = current.remoteId.isNotBlank() && PlayBilling.prices[tier] != null && !paying,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        paying = true
+                        info = null
+                        scope.launch {
+                            if (!PlayBilling.buy(activity, tier, current.remoteId)) {
+                                info = tr("الدفع بالبطاقة غير متاح الآن. تحقق من الإنترنت ومن متجر Google Play.")
+                            }
+                            paying = false
+                        }
+                    },
+                ) {
+                    Text(
+                        PlayBilling.prices[tier]?.let { tr("الدفع بالبطاقة البنكية — %1\$s", it) }
+                            ?: tr("الدفع بالبطاقة البنكية")
+                    )
+                }
+                if (mauritania) {
+                    OutlinedButton(
+                        enabled = current.remoteId.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            try {
+                                context.startActivity(Activation.whatsappIntent(Activation.buildMessage(current, tier)))
+                            } catch (e: ActivityNotFoundException) {
+                                Toast.makeText(context, tr("تطبيق واتساب غير موجود على الهاتف"), Toast.LENGTH_LONG).show()
+                            }
+                        },
+                    ) { Text(tr("الدفع عبر واتساب")) }
+                }
                 Text(
-                    tr("الدفع عبر واتساب: أرسل الطلب، وبعد الدفع يُفتح المحل تلقائيًا على هذا الهاتف."),
+                    tr("فور الدفع يُفتح المحل تلقائيًا على هذا الهاتف."),
                     style = MaterialTheme.typography.bodySmall,
                 )
-                if (checking) CircularProgressIndicator()
+                when (val st = PlayBilling.status) {
+                    "PENDING" -> Text(tr("الدفع قيد المعالجة. سيُفتح المحل تلقائيًا عند اكتماله."), color = Color(0xFF8A5A00))
+                    null -> Unit
+                    else -> if (st.startsWith("ERROR:")) {
+                        Text(tr("تعذر إتمام الدفع: %1\$s", st.removePrefix("ERROR:")), color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                if (checking || paying) CircularProgressIndicator()
                 info?.let { Text(it, color = Color(0xFF0B6E4F), fontWeight = FontWeight.Bold) }
             }
         },
-        confirmButton = {
-            Button(enabled = current.remoteId.isNotBlank(), onClick = {
-                try {
-                    context.startActivity(Activation.whatsappIntent(Activation.buildMessage(current, tier)))
-                } catch (e: ActivityNotFoundException) {
-                    Toast.makeText(context, tr("تطبيق واتساب غير موجود على الهاتف"), Toast.LENGTH_LONG).show()
-                }
-            }) { Text(tr("إرسال الطلب عبر واتساب")) }
-        },
+        confirmButton = {},
         dismissButton = {
             Row {
                 TextButton(enabled = !checking, onClick = {

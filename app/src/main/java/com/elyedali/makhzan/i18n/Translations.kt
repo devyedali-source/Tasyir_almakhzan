@@ -3,6 +3,14 @@ package com.elyedali.makhzan.i18n
 /** قواميس الترجمة: المفتاح هو النص العربي كما هو في الواجهة */
 internal object Translations {
     val fr: Map<String, String> = hashMapOf(
+        "الدفع بالبطاقة البنكية — %1\$s" to "Payer par carte bancaire — %1\$s",
+        "الدفع بالبطاقة البنكية" to "Payer par carte bancaire",
+        "الدفع عبر واتساب" to "Payer via WhatsApp",
+        "فور الدفع يُفتح المحل تلقائيًا على هذا الهاتف." to "Dès le paiement, la boutique s'active automatiquement sur ce téléphone.",
+        "الدفع قيد المعالجة. سيُفتح المحل تلقائيًا عند اكتماله." to "Paiement en cours de traitement. La boutique s'activera automatiquement une fois terminé.",
+        "تعذر إتمام الدفع: %1\$s" to "Le paiement n'a pas abouti : %1\$s",
+        "الدفع بالبطاقة غير متاح الآن. تحقق من الإنترنت ومن متجر Google Play." to "Le paiement par carte est indisponible. Vérifiez Internet et Google Play.",
+        "غير مفعّل (المحل المجاني هو أول محل لك فقط)" to "Non activée (seule votre première boutique est gratuite)",
         "ينتهي التفعيل بعد %1\$s يوم" to "L'activation expire dans %1\$s jour(s)",
         "الإعدادات" to "Paramètres",
         "فتح إعدادات الهاتف" to "Ouvrir les paramètres du téléphone",
@@ -214,6 +222,14 @@ internal object Translations {
     )
 
     val en: Map<String, String> = hashMapOf(
+        "الدفع بالبطاقة البنكية — %1\$s" to "Pay by card — %1\$s",
+        "الدفع بالبطاقة البنكية" to "Pay by card",
+        "الدفع عبر واتساب" to "Pay via WhatsApp",
+        "فور الدفع يُفتح المحل تلقائيًا على هذا الهاتف." to "As soon as you pay, the shop unlocks automatically on this phone.",
+        "الدفع قيد المعالجة. سيُفتح المحل تلقائيًا عند اكتماله." to "Payment is processing. The shop will unlock automatically when it completes.",
+        "تعذر إتمام الدفع: %1\$s" to "Payment failed: %1\$s",
+        "الدفع بالبطاقة غير متاح الآن. تحقق من الإنترنت ومن متجر Google Play." to "Card payment is unavailable right now. Check your internet and Google Play.",
+        "غير مفعّل (المحل المجاني هو أول محل لك فقط)" to "Not activated (only your first shop is free)",
         "ينتهي التفعيل بعد %1\$s يوم" to "Activation expires in %1\$s day(s)",
         "الإعدادات" to "Settings",
         "فتح إعدادات الهاتف" to "Open phone settings",

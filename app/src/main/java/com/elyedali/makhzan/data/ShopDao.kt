@@ -24,6 +24,12 @@ abstract class ShopDao {
     @Insert
     abstract suspend fun insertShop(shop: Shop): Long
 
+    @Query("SELECT MIN(id) FROM shops")
+    abstract fun firstShopId(): Flow<Long?>
+
+    @Query("SELECT * FROM shops WHERE remoteId = :remoteId LIMIT 1")
+    abstract suspend fun shopByRemoteId(remoteId: String): Shop?
+
     @Query("SELECT COUNT(*) FROM shops")
     abstract suspend fun shopCount(): Int
 
