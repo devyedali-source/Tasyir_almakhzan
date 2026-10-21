@@ -35,7 +35,12 @@ jobs:
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/makhzan-upload-key.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease --no-daemon 2>&1 | tee build.log || {
+            grep -E "^e: |error:|What went wrong" -A2 build.log | head -40 | while IFS= read -r line; do echo "::error::$line"; done
+            exit 1
+          }
 
       - name: Print signing fingerprint
         run: keytool -printcert -jarfile app/build/outputs/apk/release/*.apk | grep -E "SHA1|SHA256" || true
