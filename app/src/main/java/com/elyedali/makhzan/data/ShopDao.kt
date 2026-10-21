@@ -2,6 +2,7 @@ package com.elyedali.makhzan.data
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
@@ -21,6 +22,16 @@ abstract class ShopDao {
 
     @Insert
     abstract suspend fun insertShop(shop: Shop): Long
+
+    @Query("UPDATE shops SET name = :name WHERE id = :id")
+    abstract suspend fun updateShopName(id: Long, name: String)
+
+    // ---------- معلومات المحل وإعدادات الفاتورة ----------
+    @Query("SELECT * FROM shop_profile WHERE shopId = :shopId")
+    abstract suspend fun profileNow(shopId: Long): ShopProfile?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun saveProfile(profile: ShopProfile)
 
     // ---------- المنتجات ----------
     @Query("SELECT * FROM products WHERE shopId = :shopId ORDER BY name")
@@ -65,6 +76,9 @@ abstract class ShopDao {
 
     @Query("SELECT * FROM operations WHERE shopId = :shopId AND time >= :from ORDER BY time DESC")
     abstract fun operations(shopId: Long, from: Long): Flow<List<Operation>>
+
+    @Query("SELECT * FROM operations WHERE id = :id")
+    abstract suspend fun operationNow(id: Long): Operation?
 
     @Query("SELECT * FROM operation_lines WHERE opId = :opId")
     abstract suspend fun lines(opId: Long): List<OperationLine>

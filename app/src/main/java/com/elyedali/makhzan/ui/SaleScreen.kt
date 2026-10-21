@@ -20,7 +20,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,7 +48,7 @@ import kotlinx.coroutines.launch
 private data class SaleCartLine(val product: Product, val qty: Int)
 
 @Composable
-fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
+fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long) -> Unit) {
     val cart = remember { mutableStateListOf<SaleCartLine>() }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -103,9 +105,16 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                             }
                             scope.launch {
                                 try {
-                                    dao.recordSale(shopId, items, System.currentTimeMillis())
+                                    val opId = dao.recordSale(shopId, items, System.currentTimeMillis())
                                     cart.clear()
-                                    toast("تم تسجيل البيع: ${Money.format(total)}")
+                                    busy = false
+                                    snackbar.currentSnackbarData?.dismiss()
+                                    val r = snackbar.showSnackbar(
+                                        message = "تم تسجيل البيع: ${Money.format(total)}",
+                                        actionLabel = "الفاتورة",
+                                        duration = SnackbarDuration.Long,
+                                    )
+                                    if (r == SnackbarResult.ActionPerformed) onInvoice(opId)
                                 } catch (e: IllegalStateException) {
                                     toast(e.message ?: "تعذر تسجيل البيع")
                                 } finally {

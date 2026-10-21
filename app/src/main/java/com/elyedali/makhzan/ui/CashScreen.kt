@@ -43,7 +43,7 @@ private val InColor = Color(0xFF0B6E4F)
 private val OutColor = Color(0xFFC62828)
 
 @Composable
-fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
+fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long) -> Unit) {
     var todayOnly by remember { mutableStateOf(true) }
     val from = if (todayOnly) Dates.startOfToday() else 0L
 
@@ -125,7 +125,7 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
     }
 
     opened?.let { op ->
-        OperationLinesDialog(dao, op, onDismiss = { opened = null })
+        OperationLinesDialog(dao, op, onDismiss = { opened = null }, onInvoice = { opened = null; onInvoice(op.id) })
     }
 }
 
@@ -138,7 +138,7 @@ private fun SummaryRow(label: String, value: Long, color: Color) {
 }
 
 @Composable
-private fun OperationLinesDialog(dao: ShopDao, op: Operation, onDismiss: () -> Unit) {
+private fun OperationLinesDialog(dao: ShopDao, op: Operation, onDismiss: () -> Unit, onInvoice: () -> Unit) {
     var lines by remember { mutableStateOf<List<OperationLine>>(emptyList()) }
     LaunchedEffect(op.id) { lines = dao.lines(op.id) }
     AlertDialog(
@@ -160,5 +160,8 @@ private fun OperationLinesDialog(dao: ShopDao, op: Operation, onDismiss: () -> U
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("إغلاق") } },
+        dismissButton = {
+            if (op.type == OpType.SALE) TextButton(onClick = onInvoice) { Text("الفاتورة") }
+        },
     )
 }

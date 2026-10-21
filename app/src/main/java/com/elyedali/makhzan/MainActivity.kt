@@ -18,9 +18,11 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.elyedali.makhzan.data.AppDatabase
 import com.elyedali.makhzan.data.ShopDao
 import com.elyedali.makhzan.ui.CashScreen
+import com.elyedali.makhzan.ui.InvoiceScreen
 import com.elyedali.makhzan.ui.ProductDetailScreen
 import com.elyedali.makhzan.ui.PurchaseScreen
 import com.elyedali.makhzan.ui.SaleScreen
+import com.elyedali.makhzan.ui.SettingsScreen
 import com.elyedali.makhzan.ui.ShopHomeScreen
 import com.elyedali.makhzan.ui.ShopsScreen
 import com.elyedali.makhzan.ui.StockScreen
@@ -33,6 +35,9 @@ sealed interface Route {
     data class Cash(val shopId: Long) : Route
     data class Stock(val shopId: Long) : Route
     data class ProductDetail(val productId: Long) : Route
+    data class Settings(val shopId: Long) : Route
+    /** opId = null: فاتورة تجريبية لمعاينة التصميم */
+    data class Invoice(val shopId: Long, val opId: Long?) : Route
 }
 
 private val AppColors = lightColorScheme(
@@ -71,10 +76,12 @@ private fun AppRoot(dao: ShopDao) {
     when (val r = stack.last()) {
         Route.Shops -> ShopsScreen(dao, onOpen = { go(Route.Home(it)) })
         is Route.Home -> ShopHomeScreen(dao, r.shopId, onBack = ::back, go = ::go)
-        is Route.Sale -> SaleScreen(dao, r.shopId, onBack = ::back)
+        is Route.Sale -> SaleScreen(dao, r.shopId, onBack = ::back, onInvoice = { go(Route.Invoice(r.shopId, it)) })
         is Route.Purchase -> PurchaseScreen(dao, r.shopId, onBack = ::back)
-        is Route.Cash -> CashScreen(dao, r.shopId, onBack = ::back)
+        is Route.Cash -> CashScreen(dao, r.shopId, onBack = ::back, onInvoice = { go(Route.Invoice(r.shopId, it)) })
         is Route.Stock -> StockScreen(dao, r.shopId, onBack = ::back, onOpen = { go(Route.ProductDetail(it)) })
         is Route.ProductDetail -> ProductDetailScreen(dao, r.productId, onBack = ::back)
+        is Route.Settings -> SettingsScreen(dao, r.shopId, onBack = ::back, onPreview = { go(Route.Invoice(r.shopId, null)) })
+        is Route.Invoice -> InvoiceScreen(dao, r.shopId, r.opId, onBack = ::back)
     }
 }

@@ -100,3 +100,19 @@ data class PurchaseItem(
     val sellPrice: Long,
     val qty: Int,
 )
+
+/** معلومات المحل التي تظهر على الفواتير وإعدادات الفاتورة (جدول أضيف في الإصدار 2 من القاعدة) */
+@Entity(tableName = "shop_profile")
+data class ShopProfile(
+    @PrimaryKey val shopId: Long,
+    val address: String = "",
+    val phone: String = "",
+    val email: String = "",
+    val taxNumber: String = "",
+    val logoPath: String? = null,
+    /** 0 = كلاسيكي A4، 1 = عصري A4، 2 = إيصال 80 مم */
+    val design: Int = 0,
+    /** AR / FR / BI (مزدوجة) */
+    val language: String = "AR",
+    val showStamp: Boolean = true,
+)
