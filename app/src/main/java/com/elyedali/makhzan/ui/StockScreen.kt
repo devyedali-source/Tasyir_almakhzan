@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.elyedali.makhzan.ads.AdBanner
 import com.elyedali.makhzan.data.Dates
 import com.elyedali.makhzan.data.Money
 import com.elyedali.makhzan.data.OpType
@@ -51,7 +52,7 @@ fun StockScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onOpen: (Long) -
         it.name.contains(query.trim(), ignoreCase = true) || it.barcode.contains(query.trim())
     }
 
-    Scaffold(topBar = { AppTopBar(tr("المخزون"), onBack) }) { pad ->
+    Scaffold(topBar = { AppTopBar(tr("المخزون"), onBack) }, bottomBar = { AdBanner(dao) }) { pad ->
         LazyColumn(
             Modifier.padding(pad).fillMaxSize(),
             contentPadding = PaddingValues(16.dp),

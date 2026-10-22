@@ -14,8 +14,12 @@ android {
         applicationId = "com.elyedali.makhzan"
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.6"
+        versionCode = 7
+        versionName = "0.7"
+
+        // معرّفات AdMob: الحالية معرّفات تجريبية من Google، تُستبدل بمعرّفات حسابك قبل النشر
+        manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
+        resValue("string", "admob_banner_id", "ca-app-pub-3940256099942544/9214589741")
     }
 
     // مفتاح التوقيع الثابت: يأتي من أسرار GitHub (KEYSTORE_BASE64 و KEYSTORE_PASSWORD)
@@ -94,6 +98,10 @@ dependencies {
 
     // الدفع بالبطاقة البنكية عبر Google Play
     implementation("com.android.billingclient:billing-ktx:7.1.1")
+
+    // إعلانات بسيطة لغير المفعّلين + موافقة الخصوصية
+    implementation("com.google.android.gms:play-services-ads:23.5.0")
+    implementation("com.google.android.ump:user-messaging-platform:3.1.0")
 
     // النسخ الاحتياطي في الخلفية على Google Drive
     implementation("androidx.work:work-runtime-ktx:2.9.1")

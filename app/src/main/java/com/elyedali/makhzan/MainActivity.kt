@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.elyedali.makhzan.activation.Activation
+import com.elyedali.makhzan.ads.Ads
 import com.elyedali.makhzan.activation.ActivationRequest
 import com.elyedali.makhzan.backup.DriveAccess
 import com.elyedali.makhzan.backup.DriveBackup
@@ -338,6 +339,10 @@ private fun AppRoot(
 
     // المحل المجاني الوحيد لهذا الحساب
     LaunchedEffect(Unit) { dao.firstShopId().collect { Plans.freeShopId = it } }
+
+    // الإعلانات (بعد الدخول، مع موافقة الخصوصية حين تلزم)
+    val act = LocalContext.current as Activity
+    LaunchedEffect(Unit) { Ads.start(act) }
 
     // تسجيل المستخدم ومحلاته على الخادم مرة واحدة (للإحصائيات فقط، دون أي بيانات بيع أو مخزون)
     val ctx = LocalContext.current

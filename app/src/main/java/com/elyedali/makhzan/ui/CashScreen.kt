@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.elyedali.makhzan.ads.AdBanner
 import com.elyedali.makhzan.data.Dates
 import com.elyedali.makhzan.data.Money
 import com.elyedali.makhzan.data.OpType
@@ -64,7 +65,7 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
     val ops by remember(from) { dao.operations(shopId, from) }.collectAsState(initial = emptyList())
     var opened by remember { mutableStateOf<Operation?>(null) }
 
-    Scaffold(topBar = { AppTopBar(tr("الصندوق"), onBack) }) { pad ->
+    Scaffold(topBar = { AppTopBar(tr("الصندوق"), onBack) }, bottomBar = { AdBanner(dao) }) { pad ->
         LazyColumn(
             Modifier.padding(pad).fillMaxSize(),
             contentPadding = PaddingValues(16.dp),

@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.elyedali.makhzan.Route
+import com.elyedali.makhzan.ads.AdBanner
 import com.elyedali.makhzan.activation.Activation
 import com.elyedali.makhzan.i18n.tr
 import com.elyedali.makhzan.data.Dates
@@ -84,6 +85,7 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
     Scaffold(
         topBar = { AppTopBar(shop?.name ?: "", onBack) },
         snackbarHost = { SnackbarHost(snackbar) },
+        bottomBar = { AdBanner(dao) },
     ) { pad ->
         Column(
             Modifier

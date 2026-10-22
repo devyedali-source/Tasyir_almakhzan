@@ -1,8 +1,7 @@
 name: Build APK
 
+# البناء يدوي فقط: من تبويب Actions ← Build APK ← Run workflow
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:

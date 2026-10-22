@@ -30,6 +30,10 @@ abstract class ShopDao {
     @Query("SELECT * FROM shops WHERE remoteId = :remoteId LIMIT 1")
     abstract suspend fun shopByRemoteId(remoteId: String): Shop?
 
+    /** عدد المحلات المفعّلة الآن (لإخفاء الإعلانات عمّن فعّل أي خدمة) */
+    @Query("SELECT COUNT(*) FROM shops WHERE tier > 0 AND expiresAt > :now")
+    abstract fun activeShopCount(now: Long): Flow<Int>
+
     @Query("SELECT COUNT(*) FROM shops")
     abstract suspend fun shopCount(): Int
 

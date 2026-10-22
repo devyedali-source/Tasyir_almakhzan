@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import com.elyedali.makhzan.auth.Auth
+import com.elyedali.makhzan.ads.AdBanner
 import com.elyedali.makhzan.activation.Activation
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CloudOff
@@ -81,6 +82,7 @@ fun ShopsScreen(
                 IconButton(onClick = { showAccount = true }) { Icon(Icons.Default.AccountCircle, contentDescription = tr("حسابي")) }
             })
         },
+        bottomBar = { AdBanner(dao) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAdd = true },
