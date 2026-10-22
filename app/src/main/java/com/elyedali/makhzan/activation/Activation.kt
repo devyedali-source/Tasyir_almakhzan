@@ -219,7 +219,8 @@ object Activation {
     /** يسجّل المحل على الخادم مرة واحدة عند إنشائه (يُرسل لاحقًا تلقائيًا إن لم يتوفر الإنترنت) */
     fun registerShop(shop: Shop) {
         val user = Auth.auth.currentUser ?: return
-        if (shop.remoteId.isBlank()) return
+        // المسؤول يملك صلاحية الكتابة الكاملة: لا نعيد تسجيل محلاته حتى لا يُمسح تفعيلها
+        if (shop.remoteId.isBlank() || Auth.isAdmin()) return
         doc(shop.remoteId).set(
             mapOf(
                 "ownerUid" to user.uid,

@@ -97,7 +97,7 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                     val limit = Plans.limit(shop, now)
                     if (dao.productCount(shopId) + newInCart + 1 > limit) {
                         limitMessage = tr(
-                            tr("وصل هذا المحل إلى حد %1\$s منتجات.\nلإضافة منتجات جديدة يجب تفعيل المحل أو ترقية الباقة."),
+                            "وصل هذا المحل إلى حد %1\$s منتجات.\nلإضافة منتجات جديدة يجب تفعيل المحل أو ترقية الباقة.",
                             Plans.limitText(shop, now),
                         )
                     } else {

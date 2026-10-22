@@ -74,10 +74,10 @@ fun InvoiceScreen(dao: ShopDao, shopId: Long, opId: Long?, onBack: () -> Unit) {
 
     LaunchedEffect(shopId, opId) {
         try {
-            val shop = dao.shopNow(shopId) ?: return@LaunchedEffect
+            val shop = dao.shopNow(shopId) ?: run { error = tr("العملية غير موجودة (ربما أُلغيت)"); return@LaunchedEffect }
             val profile = dao.profileNow(shopId) ?: ShopProfile(shopId = shopId)
             val data = if (opId == null) sampleInvoice() else {
-                val op = dao.operationNow(opId) ?: return@LaunchedEffect
+                val op = dao.operationNow(opId) ?: run { error = tr("العملية غير موجودة (ربما أُلغيت)"); return@LaunchedEffect }
                 InvoiceData(
                     number = op.id, time = op.time,
                     lines = dao.lines(op.id).map { InvoiceLine(it.productName, it.qty, it.unitPrice) },

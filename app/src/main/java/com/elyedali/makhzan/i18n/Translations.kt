@@ -3,6 +3,7 @@ package com.elyedali.makhzan.i18n
 /** قواميس الترجمة: المفتاح هو النص العربي كما هو في الواجهة */
 internal object Translations {
     val fr: Map<String, String> = hashMapOf(
+        "العملية غير موجودة (ربما أُلغيت)" to "Opération introuvable (peut-être annulée)",
         "لوحة المدير" to "Tableau d'administration",
         "تحديث" to "Actualiser",
         "تعذر جلب الإحصائيات: %1\$s" to "Impossible de charger les statistiques : %1\$s",
@@ -237,6 +238,7 @@ internal object Translations {
     )
 
     val en: Map<String, String> = hashMapOf(
+        "العملية غير موجودة (ربما أُلغيت)" to "Operation not found (it may have been cancelled)",
         "لوحة المدير" to "Admin panel",
         "تحديث" to "Refresh",
         "تعذر جلب الإحصائيات: %1\$s" to "Could not load statistics: %1\$s",

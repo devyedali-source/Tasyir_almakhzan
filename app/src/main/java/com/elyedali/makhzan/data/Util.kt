@@ -42,11 +42,20 @@ object Money {
     }
 
     /** يحول النص المكتوب إلى مبلغ بالوحدة الصغرى، أو null إذا لم يكن صالحًا */
+    /** أكبر مبلغ مقبول (لتفادي أخطاء الكتابة الضخمة) */
+    private const val MAX_MINOR = 100_000_000_000_00L
+
     fun parse(text: String): Long? {
-        val t = text.trim().westernDigits()
+        var t = text.trim().replace(" ", "").replace("\u00A0", "")
+        // «1,500» أو «1.500,75»: الفاصلة قبل 3 أرقام في آخر الرقم فاصل آلاف، وإلا فهي فاصلة عشرية
+        t = t.replace('٬', ',')
+        if (t.contains(',') && t.contains('.')) t = t.replace(",", "")
+        else if (Regex("^\\d{1,3}(,\\d{3})+$").matches(t)) t = t.replace(",", "")
+        t = t.westernDigits()
         if (t.isEmpty()) return null
         val bd = t.toBigDecimalOrNull() ?: return null
         if (bd.signum() < 0) return null
+        if (bd.movePointRight(2) > java.math.BigDecimal.valueOf(MAX_MINOR)) return null
         return try {
             bd.movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValueExact()
         } catch (e: ArithmeticException) {
@@ -59,7 +68,8 @@ object Money {
 }
 
 object Qty {
-    fun parse(text: String): Int? = text.trim().westernDigits().toIntOrNull()?.takeIf { it > 0 }
+    /** كمية صحيحة موجبة لا تتجاوز مليونًا في العملية الواحدة */
+    fun parse(text: String): Int? = text.trim().westernDigits().toIntOrNull()?.takeIf { it in 1..1_000_000 }
 }
 
 object Dates {
