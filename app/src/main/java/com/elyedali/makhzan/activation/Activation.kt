@@ -1,6 +1,7 @@
 package com.elyedali.makhzan.activation
 
 import android.content.Context
+import com.elyedali.makhzan.data.TrustedClock
 import android.content.Intent
 import android.telephony.TelephonyManager
 import java.util.Locale
@@ -13,7 +14,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 
 data class PlanInfo(val tier: Int, val label: String, val price: Int)
@@ -99,6 +102,8 @@ object Activation {
     suspend fun refresh(dao: ShopDao, shop: Shop): Boolean {
         val uid = Auth.auth.currentUser?.uid ?: return false
         if (shop.remoteId.isBlank()) return false
+        // تحديث الساعة الموثوقة من الإنترنت في كل تحقق
+        withContext(Dispatchers.IO) { TrustedClock.syncWithServer() }
         return try {
             val snap = doc(shop.remoteId).get().await()
             applySnapshot(dao, shop, uid, snap.getString("ownerUid"), snap.getLong("tier"), snap.getLong("expiresAt"))
@@ -148,7 +153,7 @@ object Activation {
         val db = FirebaseFirestore.getInstance()
         return db.runTransaction { tx ->
             val snap = tx.get(ref)
-            val now = System.currentTimeMillis()
+            val now = TrustedClock.now()
             val owner = snap.getString("ownerUid")
             if (owner != null && owner != req.ownerUid) {
                 throw IllegalStateException("هذا المحل مسجل باسم حساب آخر")
@@ -182,7 +187,7 @@ object Activation {
         val ref = doc(shopRemoteId)
         return FirebaseFirestore.getInstance().runTransaction { tx ->
             val snap = tx.get(ref)
-            val now = System.currentTimeMillis()
+            val now = TrustedClock.now()
             val curTier = (snap.getLong("tier") ?: 0L).toInt()
             val curExp = snap.getLong("expiresAt") ?: 0L
             // نفس الشراء طُبّق من قبل (مثلًا انقطع الاتصال قبل الاستهلاك)
@@ -256,7 +261,7 @@ object Activation {
     suspend fun adminStats(): AdminStats {
         val db = FirebaseFirestore.getInstance()
         val shops = db.collection("shops")
-        val now = System.currentTimeMillis()
+        val now = TrustedClock.now()
         suspend fun count(q: com.google.firebase.firestore.Query) = q.count().get(AggregateSource.SERVER).await().count
         return AdminStats(
             users = count(db.collection("users")),

@@ -1,6 +1,7 @@
 package com.elyedali.makhzan.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import com.elyedali.makhzan.data.TrustedClock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
@@ -80,7 +81,7 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
     }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val now = System.currentTimeMillis()
+    val now = TrustedClock.now()
 
     Scaffold(
         topBar = { AppTopBar(shop?.name ?: "", onBack) },
@@ -163,11 +164,11 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
             // العمليات الرئيسية
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 BigAction(tr("بيع"), Icons.Default.QrCodeScanner, Color(0xFF0B6E4F), Modifier.weight(1f)) {
-                    if (shop?.let { Plans.isLocked(it, count, System.currentTimeMillis()) } == true) showActivation = true
+                    if (shop?.let { Plans.isLocked(it, count, TrustedClock.now()) } == true) showActivation = true
                     else go(Route.Sale(shopId))
                 }
                 BigAction(tr("شراء"), Icons.Default.AddShoppingCart, Color(0xFF1565C0), Modifier.weight(1f)) {
-                    if (shop?.let { Plans.isLocked(it, count, System.currentTimeMillis()) } == true) showActivation = true
+                    if (shop?.let { Plans.isLocked(it, count, TrustedClock.now()) } == true) showActivation = true
                     else go(Route.Purchase(shopId))
                 }
             }
@@ -204,7 +205,7 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
                     dao.insertOperation(
                         Operation(
                             shopId = shopId, type = OpType.EXPENSE, total = amount,
-                            note = note, time = System.currentTimeMillis(),
+                            note = note, time = TrustedClock.now(),
                         )
                     )
                     snackbar.showSnackbar(tr("تم تسجيل المصروف"))

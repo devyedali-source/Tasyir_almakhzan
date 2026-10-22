@@ -1,6 +1,7 @@
 package com.elyedali.makhzan
 
 import android.app.Application
+import com.elyedali.makhzan.data.TrustedClock
 import androidx.room.InvalidationTracker
 import com.elyedali.makhzan.backup.DriveBackup
 import com.elyedali.makhzan.billing.PlayBilling
@@ -19,6 +20,9 @@ class MakhzanApp : Application() {
     override fun onCreate() {
         super.onCreate()
         I18n.init(this)
+        // ساعة موثوقة: تمنع إطالة التفعيل بتغيير تاريخ الهاتف (كما في دفتر المعلم)
+        TrustedClock.init(this)
+        appScope.launch { TrustedClock.syncWithServer() }
         PlayBilling.init(this)
         // مشتريات دُفعت ولم يُكتب تفعيلها بعد (انقطاع الاتصال): تُعالج عند كل دخول
         FirebaseAuth.getInstance().addAuthStateListener { if (it.currentUser != null) PlayBilling.processPending() }

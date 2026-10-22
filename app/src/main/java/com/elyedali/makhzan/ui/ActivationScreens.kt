@@ -1,6 +1,7 @@
 package com.elyedali.makhzan.ui
 
 import android.app.Activity
+import com.elyedali.makhzan.data.TrustedClock
 import android.content.ActivityNotFoundException
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
@@ -59,7 +60,7 @@ fun ActivationDialog(dao: ShopDao, shop: Shop, productCount: Int, onDismiss: () 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val needed = Plans.neededTier(productCount)
-    var tier by remember { mutableStateOf(maxOf(needed, if (Plans.isActive(shop, System.currentTimeMillis())) shop.tier else 1)) }
+    var tier by remember { mutableStateOf(maxOf(needed, if (Plans.isActive(shop, TrustedClock.now())) shop.tier else 1)) }
     var current by remember { mutableStateOf(shop) }
     var checking by remember { mutableStateOf(false) }
     var info by remember { mutableStateOf<String?>(null) }
@@ -87,7 +88,7 @@ fun ActivationDialog(dao: ShopDao, shop: Shop, productCount: Int, onDismiss: () 
                 scope.launch {
                     dao.updateActivation(current.id, t, exp)
                     current = current.copy(tier = t, expiresAt = exp)
-                    if (exp > System.currentTimeMillis()) {
+                    if (exp > TrustedClock.now()) {
                         info = tr("تم تفعيل المحل حتى %1\$s", Dates.formatDay(exp))
                     }
                 }
@@ -96,7 +97,7 @@ fun ActivationDialog(dao: ShopDao, shop: Shop, productCount: Int, onDismiss: () 
         onDispose { reg?.remove() }
     }
 
-    val now = System.currentTimeMillis()
+    val now = TrustedClock.now()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(tr("تفعيل المحل: %1\$s", current.name)) },
@@ -184,7 +185,7 @@ fun ActivationDialog(dao: ShopDao, shop: Shop, productCount: Int, onDismiss: () 
                         val ok = Activation.refresh(dao, current)
                         current = dao.shopNow(current.id) ?: current
                         info = if (!ok) tr("تعذر الاتصال. تحقق من الإنترنت.")
-                        else if (Plans.isActive(current, System.currentTimeMillis()))
+                        else if (Plans.isActive(current, TrustedClock.now()))
                             tr("تم تفعيل المحل حتى %1\$s", Dates.formatDay(current.expiresAt))
                         else tr("لم يُفعَّل المحل بعد")
                         checking = false
@@ -231,7 +232,7 @@ fun AdminActivateScreen(req: ActivationRequest, onBack: () -> Unit) {
                         if (loading) CircularProgressIndicator()
                         state?.let { (t, exp) ->
                             Text(
-                                if (t > 0 && exp > System.currentTimeMillis())
+                                if (t > 0 && exp > TrustedClock.now())
                                     tr("الحالة الحالية: مفعّل (%1\$s) حتى %2\$s", tr(Activation.plan(t)?.label ?: ""), Dates.formatDay(exp))
                                 else tr("الحالة الحالية: غير مفعّل"),
                                 style = MaterialTheme.typography.bodySmall,

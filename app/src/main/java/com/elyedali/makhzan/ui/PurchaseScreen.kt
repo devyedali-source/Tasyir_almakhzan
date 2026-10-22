@@ -1,6 +1,7 @@
 package com.elyedali.makhzan.ui
 
 import androidx.activity.compose.BackHandler
+import com.elyedali.makhzan.data.TrustedClock
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
@@ -92,7 +93,7 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                 else -> {
                     // منتج جديد: نتحقق من حد المنتجات المسموح به لهذا المحل
                     val shop = dao.shopNow(shopId) ?: return@launch
-                    val now = System.currentTimeMillis()
+                    val now = TrustedClock.now()
                     val newInCart = cart.count { it.productId == null }
                     val limit = Plans.limit(shop, now)
                     if (dao.productCount(shopId) + newInCart + 1 > limit) {
@@ -136,7 +137,7 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                             val items = cart.toList()
                             scope.launch {
                                 try {
-                                    dao.recordPurchase(shopId, items, System.currentTimeMillis())
+                                    dao.recordPurchase(shopId, items, TrustedClock.now())
                                     cart.clear()
                                     toast(tr("تم تسجيل الشراء: %1\$s", Money.format(total)))
                                 } catch (e: Exception) {

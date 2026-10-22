@@ -1,6 +1,7 @@
 package com.elyedali.makhzan.ui
 
 import androidx.compose.material3.AlertDialog
+import com.elyedali.makhzan.data.TrustedClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -116,7 +117,7 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                             }
                             scope.launch {
                                 try {
-                                    val opId = dao.recordSale(shopId, items, System.currentTimeMillis())
+                                    val opId = dao.recordSale(shopId, items, TrustedClock.now())
                                     cart.clear()
                                     busy = false
                                     snackbar.currentSnackbarData?.dismiss()

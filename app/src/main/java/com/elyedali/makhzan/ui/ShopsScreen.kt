@@ -1,6 +1,7 @@
 package com.elyedali.makhzan.ui
 
 import androidx.compose.foundation.background
+import com.elyedali.makhzan.data.TrustedClock
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
@@ -68,7 +69,7 @@ fun ShopsScreen(
     var showAccount by remember { mutableStateOf(false) }
     var showLang by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val now = System.currentTimeMillis()
+    val now = TrustedClock.now()
 
     Scaffold(
         topBar = {
@@ -162,7 +163,7 @@ fun ShopsScreen(
             onConfirm = { name ->
                 showAdd = false
                 scope.launch {
-                    val newShop = Shop(name = name, createdAt = System.currentTimeMillis(), remoteId = UUID.randomUUID().toString())
+                    val newShop = Shop(name = name, createdAt = TrustedClock.now(), remoteId = UUID.randomUUID().toString())
                     val id = dao.insertShop(newShop)
                     Activation.registerShop(newShop.copy(id = id))
                 }

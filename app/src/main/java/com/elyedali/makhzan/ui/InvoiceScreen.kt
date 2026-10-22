@@ -1,6 +1,7 @@
 package com.elyedali.makhzan.ui
 
 import android.content.Context
+import com.elyedali.makhzan.data.TrustedClock
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color as AColor
@@ -143,7 +144,7 @@ fun InvoiceScreen(dao: ShopDao, shopId: Long, opId: Long?, onBack: () -> Unit) {
 
 private fun sampleInvoice() = InvoiceData(
     number = 1,
-    time = System.currentTimeMillis(),
+    time = TrustedClock.now(),
     lines = listOf(
         InvoiceLine(tr("حليب مجفف 400غ"), 2, 15000),
         InvoiceLine(tr("سكر 1 كغ"), 1, 4500),

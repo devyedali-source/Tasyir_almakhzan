@@ -1,6 +1,7 @@
 package com.elyedali.makhzan.ads
 
 import android.app.Activity
+import com.elyedali.makhzan.data.TrustedClock
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -63,7 +64,7 @@ object Ads {
 /** شريط الإعلان: يظهر فقط إذا لم يكن لدى المستخدم أي محل مفعّل */
 @Composable
 fun AdBanner(dao: ShopDao) {
-    val now = remember { System.currentTimeMillis() }
+    val now = remember { TrustedClock.now() }
     val activeShops by dao.activeShopCount(now).collectAsState(initial = -1)
     if (!Ads.ready || activeShops != 0 || Auth.isAdmin()) return
 
