@@ -164,7 +164,11 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(tr("البضاعة المُدخلة (%1\$s)", cart.size), style = MaterialTheme.typography.titleMedium)
-                if (cart.isNotEmpty()) TextButton(onClick = { cart.clear() }) { Text(tr("إفراغ")) }
+                Row {
+                    // سلعة لا تحمل كودًا (خبز، سلع سائبة…): يُنشأ لها رمز داخلي وتُباع من زر «بحث» في شاشة البيع
+                    TextButton(onClick = { onScanned("IN-" + java.lang.Long.toString(System.currentTimeMillis(), 36).uppercase()) }) { Text(tr("بلا كود")) }
+                    if (cart.isNotEmpty()) TextButton(onClick = { cart.clear() }) { Text(tr("إفراغ")) }
+                }
             }
             if (cart.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

@@ -3,6 +3,10 @@ package com.elyedali.makhzan.i18n
 /** قواميس الترجمة: المفتاح هو النص العربي كما هو في الواجهة */
 internal object Translations {
     val fr: Map<String, String> = hashMapOf(
+        "بلا كود" to "Sans code",
+        "بحث" to "Rechercher",
+        "اختيار منتج" to "Choisir un produit",
+        "نفد" to "Épuisé",
         "العملية غير موجودة (ربما أُلغيت)" to "Opération introuvable (peut-être annulée)",
         "لوحة المدير" to "Tableau d'administration",
         "تحديث" to "Actualiser",
@@ -238,6 +242,10 @@ internal object Translations {
     )
 
     val en: Map<String, String> = hashMapOf(
+        "بلا كود" to "No barcode",
+        "بحث" to "Search",
+        "اختيار منتج" to "Choose a product",
+        "نفد" to "Out of stock",
         "العملية غير موجودة (ربما أُلغيت)" to "Operation not found (it may have been cancelled)",
         "لوحة المدير" to "Admin panel",
         "تحديث" to "Refresh",

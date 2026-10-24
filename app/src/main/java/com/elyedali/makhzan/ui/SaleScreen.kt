@@ -1,5 +1,11 @@
 package com.elyedali.makhzan.ui
 
+import com.elyedali.makhzan.data.Qty
+import androidx.compose.runtime.collectAsState
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.AlertDialog
 import com.elyedali.makhzan.data.TrustedClock
 import androidx.activity.compose.BackHandler
@@ -61,6 +67,8 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
     var busy by remember { mutableStateOf(false) }
 
     var confirmLeave by remember { mutableStateOf(false) }
+    var editLine by remember { mutableStateOf<SaleCartLine?>(null) }
+    var showSearch by remember { mutableStateOf(false) }
     fun tryBack() { if (cart.isNotEmpty()) confirmLeave = true else onBack() }
     BackHandler(enabled = cart.isNotEmpty()) { confirmLeave = true }
 
@@ -157,7 +165,14 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(tr("السلة (%1\$s)", cart.sumOf { it.qty }), style = MaterialTheme.typography.titleMedium)
-                if (cart.isNotEmpty()) TextButton(onClick = { cart.clear() }) { Text(tr("إفراغ السلة")) }
+                Row {
+                    // بديل عند تلف الكود أو صعوبة قراءته: اختيار المنتج من القائمة
+                    TextButton(onClick = { showSearch = true }) {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                        Text(" " + tr("بحث"))
+                    }
+                    if (cart.isNotEmpty()) TextButton(onClick = { cart.clear() }) { Text(tr("إفراغ السلة")) }
+                }
             }
             if (cart.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -177,11 +192,69 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                             qty = line.qty,
                             onPlus = { changeQty(line.product, +1) },
                             onMinus = { changeQty(line.product, -1) },
+                            onQtyClick = { editLine = line },
                         )
                     }
                 }
             }
         }
+    }
+
+    editLine?.let { line ->
+        var text by remember(line.product.id) { mutableStateOf(line.qty.toString()) }
+        val q = Qty.parse(text)
+        AlertDialog(
+            onDismissRequest = { editLine = null },
+            title = { Text(line.product.name) },
+            text = {
+                Column {
+                    NumberField(text, { text = it }, tr("الكمية"))
+                    Text(tr("الموجود في المخزون: %1\$s", line.product.qty), style = MaterialTheme.typography.bodySmall)
+                    if (q != null && q > line.product.qty) ErrorText(tr("الكمية المتوفرة من «%1\$s» هي %2\$s فقط", line.product.name, line.product.qty))
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = q != null && q <= line.product.qty, onClick = {
+                    val i = cart.indexOfFirst { it.product.id == line.product.id }
+                    if (i >= 0 && q != null) cart[i] = cart[i].copy(qty = q)
+                    editLine = null
+                }) { Text(tr("حفظ")) }
+            },
+            dismissButton = { TextButton(onClick = { editLine = null }) { Text(tr("إلغاء")) } },
+        )
+    }
+
+    if (showSearch) {
+        val products by dao.products(shopId).collectAsState(initial = emptyList())
+        var query by remember { mutableStateOf("") }
+        val shown = products.filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) }
+        AlertDialog(
+            onDismissRequest = { showSearch = false },
+            title = { Text(tr("اختيار منتج")) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = query, onValueChange = { query = it }, singleLine = true,
+                        label = { Text(tr("بحث بالاسم")) }, modifier = Modifier.fillMaxWidth(),
+                    )
+                    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+                        items(shown, key = { it.id }) { p ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable { changeQty(p, +1); showSearch = false }.padding(vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(p.name, modifier = Modifier.weight(1f))
+                                Text(
+                                    if (p.qty > 0) Money.format(p.sellPrice) else tr("نفد"),
+                                    color = if (p.qty > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showSearch = false }) { Text(tr("إغلاق")) } },
+        )
     }
 
     if (confirmLeave) {
@@ -207,6 +280,7 @@ fun CartRow(
     qty: Int,
     onPlus: (() -> Unit)?,
     onMinus: () -> Unit,
+    onQtyClick: (() -> Unit)? = null,
 ) {
     Card(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -216,7 +290,11 @@ fun CartRow(
                 Text(lineTotal, fontWeight = FontWeight.SemiBold)
             }
             IconButton(onClick = onMinus) { Icon(Icons.Default.Remove, contentDescription = tr("إنقاص")) }
-            Text("$qty", style = MaterialTheme.typography.titleMedium)
+            // الضغط على الرقم يسمح بكتابة الكمية مباشرة (مثلًا 24 قطعة)
+            Text(
+                "$qty", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                modifier = if (onQtyClick != null) Modifier.clickable(onClick = onQtyClick).padding(horizontal = 8.dp, vertical = 4.dp) else Modifier,
+            )
             if (onPlus != null) {
                 IconButton(onClick = onPlus) { Icon(Icons.Default.Add, contentDescription = tr("زيادة")) }
             }
