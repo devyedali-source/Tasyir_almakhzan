@@ -1,5 +1,6 @@
 package com.elyedali.makhzan.ui
 
+import androidx.compose.material3.OutlinedButton
 import com.elyedali.makhzan.data.Qty
 import androidx.compose.runtime.collectAsState
 import androidx.compose.material3.OutlinedTextField
@@ -69,6 +70,7 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
     var confirmLeave by remember { mutableStateOf(false) }
     var editLine by remember { mutableStateOf<SaleCartLine?>(null) }
     var showSearch by remember { mutableStateOf(false) }
+    var showCreditPicker by remember { mutableStateOf(false) }
     fun tryBack() { if (cart.isNotEmpty()) confirmLeave = true else onBack() }
     BackHandler(enabled = cart.isNotEmpty()) { confirmLeave = true }
 
@@ -93,6 +95,38 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
 
     val total = cart.sumOf { it.product.sellPrice * it.qty }
 
+    /** customerId = null: بيع نقدي؛ غير ذلك: بيع بالدَّين على هذا الزبون */
+    fun confirmSale(customerId: Long?) {
+        busy = true
+        val saleTotal = total
+        val items = cart.map {
+            SaleItem(
+                productId = it.product.id, name = it.product.name,
+                barcode = it.product.barcode, qty = it.qty,
+                unitPrice = it.product.sellPrice, unitCost = it.product.buyPrice,
+            )
+        }
+        scope.launch {
+            try {
+                val opId = dao.recordSale(shopId, items, TrustedClock.now(), customerId)
+                cart.clear()
+                busy = false
+                snackbar.currentSnackbarData?.dismiss()
+                val r = snackbar.showSnackbar(
+                    message = if (customerId == null) tr("تم تسجيل البيع: %1\$s", Money.format(saleTotal))
+                    else tr("تم تسجيل البيع بالدَّين: %1\$s", Money.format(saleTotal)),
+                    actionLabel = tr("الفاتورة"),
+                    duration = SnackbarDuration.Long,
+                )
+                if (r == SnackbarResult.ActionPerformed) onInvoice(opId)
+            } catch (e: IllegalStateException) {
+                toast(e.message ?: tr("تعذر تسجيل البيع"))
+            } finally {
+                busy = false
+            }
+        }
+    }
+
     Scaffold(
         topBar = { AppTopBar(tr("بيع"), ::tryBack) },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -110,39 +144,21 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                             fontWeight = FontWeight.Bold,
                         )
                     }
-                    Button(
-                        enabled = cart.isNotEmpty() && !busy,
-                        modifier = Modifier.height(54.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        onClick = {
-                            busy = true
-                            val items = cart.map {
-                                SaleItem(
-                                    productId = it.product.id, name = it.product.name,
-                                    barcode = it.product.barcode, qty = it.qty,
-                                    unitPrice = it.product.sellPrice, unitCost = it.product.buyPrice,
-                                )
-                            }
-                            scope.launch {
-                                try {
-                                    val opId = dao.recordSale(shopId, items, TrustedClock.now())
-                                    cart.clear()
-                                    busy = false
-                                    snackbar.currentSnackbarData?.dismiss()
-                                    val r = snackbar.showSnackbar(
-                                        message = tr("تم تسجيل البيع: %1\$s", Money.format(total)),
-                                        actionLabel = tr("الفاتورة"),
-                                        duration = SnackbarDuration.Long,
-                                    )
-                                    if (r == SnackbarResult.ActionPerformed) onInvoice(opId)
-                                } catch (e: IllegalStateException) {
-                                    toast(e.message ?: tr("تعذر تسجيل البيع"))
-                                } finally {
-                                    busy = false
-                                }
-                            }
-                        },
-                    ) { Text(tr("تأكيد البيع"), style = MaterialTheme.typography.titleMedium) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // البيع بالدَّين: يُسجَّل على زبون ولا يدخل الصندوق حتى يُسدَّد
+                        OutlinedButton(
+                            enabled = cart.isNotEmpty() && !busy,
+                            modifier = Modifier.height(54.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            onClick = { showCreditPicker = true },
+                        ) { Text(tr("دَين")) }
+                        Button(
+                            enabled = cart.isNotEmpty() && !busy,
+                            modifier = Modifier.height(54.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            onClick = { confirmSale(null) },
+                        ) { Text(tr("تأكيد البيع"), style = MaterialTheme.typography.titleMedium) }
+                    }
                 }
             }
         },
@@ -254,6 +270,14 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                 }
             },
             confirmButton = { TextButton(onClick = { showSearch = false }) { Text(tr("إغلاق")) } },
+        )
+    }
+
+    if (showCreditPicker) {
+        CustomerPickerDialog(
+            dao, shopId, total,
+            onDismiss = { showCreditPicker = false },
+            onPick = { id -> showCreditPicker = false; confirmSale(id) },
         )
     }
 

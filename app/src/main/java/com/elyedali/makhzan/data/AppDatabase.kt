@@ -12,8 +12,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * أي تغيير مستقبلي في الجداول يكون بترحيل (Migration) يحفظ بيانات التاجر.
  */
 @Database(
-    entities = [Shop::class, Product::class, Operation::class, OperationLine::class, ShopProfile::class],
-    version = 3,
+    entities = [Shop::class, Product::class, Operation::class, OperationLine::class, ShopProfile::class, Customer::class],
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,6 +40,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** الإصدار 4: الزبائن والبيع بالدَّين، دون المساس بأي بيانات موجودة */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `customers` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`shopId` INTEGER NOT NULL, `name` TEXT NOT NULL, `phone` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_customers_shopId` ON `customers` (`shopId`)")
+                db.execSQL("ALTER TABLE `operations` ADD COLUMN `customerId` INTEGER")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_operations_customerId` ON `operations` (`customerId`)")
+            }
+        }
+
         const val FILE_NAME = "makhzan.db"
 
         @Volatile private var instance: AppDatabase? = null
@@ -47,7 +60,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(
                 context.applicationContext, AppDatabase::class.java, FILE_NAME
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
         }
 
         /** يغلق القاعدة قبل استبدال ملفها عند الاسترجاع من Drive */

@@ -110,11 +110,68 @@ abstract class ShopDao {
     @Query("SELECT * FROM operation_lines WHERE opId = :opId")
     abstract suspend fun lines(opId: Long): List<OperationLine>
 
+    /** رصيد الصندوق: البيع النقدي والتسديد يدخلان، الشراء والمصروف يخرجان، والبيع بالدَّين لا يُحسب */
     @Query(
-        "SELECT COALESCE(SUM(CASE WHEN type = 'SALE' THEN total ELSE -total END), 0) " +
+        "SELECT COALESCE(SUM(CASE " +
+            "WHEN type = 'SALE' AND customerId IS NOT NULL THEN 0 " +
+            "WHEN type IN ('SALE', 'PAYMENT') THEN total " +
+            "ELSE -total END), 0) " +
             "FROM operations WHERE shopId = :shopId"
     )
     abstract fun balance(shopId: Long): Flow<Long>
+
+    // ---------- الزبائن والديون ----------
+    @Insert
+    abstract suspend fun insertCustomer(customer: Customer): Long
+
+    @Query(
+        "SELECT c.*, " +
+            "COALESCE((SELECT SUM(o.total) FROM operations o WHERE o.customerId = c.id AND o.type = 'SALE'), 0) - " +
+            "COALESCE((SELECT SUM(o.total) FROM operations o WHERE o.customerId = c.id AND o.type = 'PAYMENT'), 0) AS debt " +
+            "FROM customers c WHERE c.shopId = :shopId ORDER BY debt DESC, c.name"
+    )
+    abstract fun customersWithDebt(shopId: Long): Flow<List<CustomerDebt>>
+
+    @Query("SELECT * FROM customers WHERE id = :id")
+    abstract fun customer(id: Long): Flow<Customer?>
+
+    @Query("SELECT * FROM customers WHERE id = :id")
+    abstract suspend fun customerNow(id: Long): Customer?
+
+    @Query(
+        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE customerId = :customerId AND type = 'SALE'), 0) - " +
+            "COALESCE((SELECT SUM(total) FROM operations WHERE customerId = :customerId AND type = 'PAYMENT'), 0)"
+    )
+    abstract fun customerDebt(customerId: Long): Flow<Long>
+
+    @Query(
+        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE customerId = :customerId AND type = 'SALE'), 0) - " +
+            "COALESCE((SELECT SUM(total) FROM operations WHERE customerId = :customerId AND type = 'PAYMENT'), 0)"
+    )
+    abstract suspend fun customerDebtNow(customerId: Long): Long
+
+    @Query(
+        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE shopId = :shopId AND customerId IS NOT NULL AND type = 'SALE'), 0) - " +
+            "COALESCE((SELECT SUM(total) FROM operations WHERE shopId = :shopId AND type = 'PAYMENT'), 0)"
+    )
+    abstract fun totalDebt(shopId: Long): Flow<Long>
+
+    @Query("SELECT * FROM operations WHERE customerId = :customerId ORDER BY time DESC")
+    abstract fun customerOperations(customerId: Long): Flow<List<Operation>>
+
+    @Query("UPDATE customers SET name = :name, phone = :phone WHERE id = :id")
+    abstract suspend fun updateCustomer(id: Long, name: String, phone: String)
+
+    /** تسديد زبون: لا يُقبل مبلغ أكبر من دينه */
+    @Transaction
+    open suspend fun recordPayment(shopId: Long, customerId: Long, amount: Long, time: Long): Long {
+        require(amount > 0)
+        val debt = customerDebtNow(customerId)
+        if (amount > debt) throw IllegalStateException(tr("المبلغ أكبر من الدَّين المتبقي"))
+        return insertOperation(
+            Operation(shopId = shopId, type = OpType.PAYMENT, total = amount, note = "", time = time, customerId = customerId)
+        )
+    }
 
     @Query("SELECT COALESCE(SUM(total), 0) FROM operations WHERE shopId = :shopId AND type = :type AND time >= :from")
     abstract fun sumType(shopId: Long, type: String, from: Long): Flow<Long>
@@ -138,7 +195,7 @@ abstract class ShopDao {
 
     /** يسجل البيع: ينقص المخزون ويدخل المبلغ في الصندوق. يرفض البيع إذا كانت الكمية غير كافية. */
     @Transaction
-    open suspend fun recordSale(shopId: Long, items: List<SaleItem>, time: Long): Long {
+    open suspend fun recordSale(shopId: Long, items: List<SaleItem>, time: Long, customerId: Long? = null): Long {
         require(items.isNotEmpty())
         for (item in items) {
             val p = productNow(item.productId)
@@ -149,7 +206,7 @@ abstract class ShopDao {
         }
         val total = items.sumOf { it.unitPrice * it.qty }
         val opId = insertOperation(
-            Operation(shopId = shopId, type = OpType.SALE, total = total, note = "", time = time)
+            Operation(shopId = shopId, type = OpType.SALE, total = total, note = "", time = time, customerId = customerId)
         )
         for (item in items) {
             insertLine(
@@ -212,6 +269,10 @@ abstract class ShopDao {
     @Transaction
     open suspend fun cancelOperation(opId: Long) {
         val op = operationNow(opId) ?: return
+        // لا يُلغى بيع بالدَّين إذا كان ذلك سيجعل ما سدّده الزبون أكبر من دينه
+        if (op.isCredit && op.customerId != null && customerDebtNow(op.customerId) < op.total) {
+            throw IllegalStateException(tr("ألغِ أولًا تسديدات هذا الزبون، فقد سدّد جزءًا من هذا البيع"))
+        }
         val opLines = lines(opId)
         when (op.type) {
             OpType.SALE -> opLines.forEach { addQty(it.productId, it.qty) }

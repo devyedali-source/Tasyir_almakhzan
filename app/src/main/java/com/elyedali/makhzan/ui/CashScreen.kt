@@ -40,6 +40,8 @@ import com.elyedali.makhzan.data.Money
 import com.elyedali.makhzan.data.OpType
 import com.elyedali.makhzan.data.Operation
 import com.elyedali.makhzan.data.OperationLine
+import com.elyedali.makhzan.data.cashEffect
+import com.elyedali.makhzan.data.isCredit
 import com.elyedali.makhzan.data.ShopDao
 import kotlinx.coroutines.launch
 import com.elyedali.makhzan.i18n.tr
@@ -61,6 +63,8 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
     val sales by remember(from) { dao.sumType(shopId, OpType.SALE, from) }.collectAsState(initial = 0L)
     val purchases by remember(from) { dao.sumType(shopId, OpType.PURCHASE, from) }.collectAsState(initial = 0L)
     val expenses by remember(from) { dao.sumType(shopId, OpType.EXPENSE, from) }.collectAsState(initial = 0L)
+    val payments by remember(from) { dao.sumType(shopId, OpType.PAYMENT, from) }.collectAsState(initial = 0L)
+    val debts by dao.totalDebt(shopId).collectAsState(initial = 0L)
     val profit by remember(from) { dao.profit(shopId, from) }.collectAsState(initial = 0L)
     val ops by remember(from) { dao.operations(shopId, from) }.collectAsState(initial = emptyList())
     var opened by remember { mutableStateOf<Operation?>(null) }
@@ -104,6 +108,10 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                         StatTile(tr("المصاريف"), expenses, OutColor, Modifier.weight(1f))
                         StatTile(tr("ربح المبيعات"), profit, InColor, Modifier.weight(1f))
                     }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        StatTile(tr("مقبوضات الديون"), payments, InColor, Modifier.weight(1f))
+                        StatTile(tr("الديون الحالية"), debts, Color(0xFFB45309), Modifier.weight(1f))
+                    }
                     // الربح الصافي = ربح المبيعات − المصاريف
                     StatTile(tr("الربح الصافي"), profit - expenses, if (profit - expenses < 0) OutColor else InColor, Modifier.fillMaxWidth())
                 }
@@ -115,7 +123,7 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                 item { Text(tr("لا توجد عمليات في هذه الفترة")) }
             }
             items(ops, key = { it.id }) { op ->
-                val isIn = op.type == OpType.SALE
+                val effect = op.cashEffect
                 Card(
                     onClick = { opened = op },
                     modifier = Modifier.fillMaxWidth(),
@@ -123,15 +131,17 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                OpType.label(op.type) + if (op.note.isNotBlank()) " — ${op.note}" else "",
+                                (if (op.isCredit) tr("بيع بالدَّين") else OpType.label(op.type)) +
+                                    if (op.note.isNotBlank()) " — ${op.note}" else "",
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             Text(Dates.format(op.time), style = MaterialTheme.typography.bodySmall)
                         }
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            (if (isIn) "+" else "−") + Money.format(op.total),
-                            color = if (isIn) InColor else OutColor,
+                            // البيع بالدَّين لا يدخل الصندوق: يُعرض المبلغ دون إشارة وبلون مختلف
+                            (if (effect > 0) "+" else if (effect < 0) "−" else "") + Money.format(op.total),
+                            color = if (effect > 0) InColor else if (effect < 0) OutColor else Color(0xFFB45309),
                             fontWeight = FontWeight.Bold,
                         )
                     }
@@ -165,13 +175,18 @@ private fun OperationLinesDialog(dao: ShopDao, op: Operation, onDismiss: () -> U
     var confirmCancel by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(op.id) { lines = dao.lines(op.id) }
+    var customerName by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(op.id) {
+        lines = dao.lines(op.id)
+        customerName = op.customerId?.let { dao.customerNow(it)?.name }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(OpType.label(op.type) + " — " + Dates.format(op.time)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (op.note.isNotBlank()) Text(op.note)
+                customerName?.let { Text(tr("الزبون: %1\$s", it), fontWeight = FontWeight.SemiBold) }
                 lines.forEach { l ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("${l.productName} × ${l.qty}", modifier = Modifier.weight(1f))

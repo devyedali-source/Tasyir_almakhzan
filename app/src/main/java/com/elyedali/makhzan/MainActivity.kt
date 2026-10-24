@@ -60,6 +60,8 @@ import com.elyedali.makhzan.ui.AdminActivateScreen
 import com.elyedali.makhzan.ui.AdminPanelScreen
 import kotlinx.coroutines.flow.first
 import com.elyedali.makhzan.ui.CashScreen
+import com.elyedali.makhzan.ui.CustomerDetailScreen
+import com.elyedali.makhzan.ui.CustomersScreen
 import com.elyedali.makhzan.ui.InvoiceScreen
 import com.elyedali.makhzan.ui.LoginScreen
 import com.elyedali.makhzan.ui.ProductDetailScreen
@@ -86,6 +88,8 @@ sealed interface Route {
     data class Invoice(val shopId: Long, val opId: Long?) : Route
     data class AdminActivate(val req: ActivationRequest) : Route
     data object AdminPanel : Route
+    data class Customers(val shopId: Long) : Route
+    data class CustomerDetail(val shopId: Long, val customerId: Long) : Route
 }
 
 private fun Route.shopId(): Long? = when (this) {
@@ -96,6 +100,8 @@ private fun Route.shopId(): Long? = when (this) {
     is Route.Stock -> shopId
     is Route.Settings -> shopId
     is Route.Invoice -> shopId
+    is Route.Customers -> shopId
+    is Route.CustomerDetail -> shopId
     else -> null
 }
 
@@ -377,6 +383,10 @@ private fun AppRoot(
         is Route.Invoice -> InvoiceScreen(dao, r.shopId, r.opId, onBack = ::back)
         is Route.AdminActivate -> AdminActivateScreen(r.req, onBack = ::back)
         Route.AdminPanel -> AdminPanelScreen(onBack = ::back, onActivate = { go(Route.AdminActivate(it)) })
+        is Route.Customers -> CustomersScreen(dao, r.shopId, onBack = ::back, onOpen = { go(Route.CustomerDetail(r.shopId, it)) })
+        is Route.CustomerDetail -> CustomerDetailScreen(
+            dao, r.shopId, r.customerId, onBack = ::back, onInvoice = { go(Route.Invoice(r.shopId, it)) },
+        )
     }
 }
 

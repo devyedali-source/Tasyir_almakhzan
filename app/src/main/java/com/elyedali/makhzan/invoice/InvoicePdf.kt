@@ -23,6 +23,8 @@ data class InvoiceData(
     val number: Long,
     val time: Long,
     val lines: List<InvoiceLine>,
+    /** اسم الزبون في البيع بالدَّين (null = بيع نقدي) */
+    val creditCustomer: String? = null,
 ) {
     val total: Long get() = lines.sumOf { it.unitPrice * it.qty }
 }
@@ -52,6 +54,8 @@ class Labels(val lang: String, customCurrency: String = "") {
     val thanks = t("شكرًا لزيارتكم", "Merci de votre visite", "Thank you for your visit")
     val currency = customCurrency.ifBlank { t("أوقية", "MRU", "MRU").let { if (lang == "BI") "أوقية MRU" else it } }
     val itemsCount = t("عدد القطع", "Nb articles", "Items")
+    val customer = t("الزبون", "Client", "Customer")
+    val credit = t("بيع بالدَّين — غير مدفوع", "Vente à crédit — non payée", "Credit sale — unpaid")
 
     fun money(v: Long) = "${Money.format(v, withCurrency = false)} $currency"
     fun plain(v: Long) = Money.format(v, withCurrency = false)
@@ -240,6 +244,11 @@ object InvoicePdf {
             val pMeta = paint(10.5f)
             c.textStart("${labels.number}: ${data.number}", L, R, after, pMeta, rtl)
             c.textEnd("${labels.date}: ${Dates.format(data.time)}", L, R, after, pMeta, rtl)
+            data.creditCustomer?.let { name ->
+                after += 16
+                c.textStart("${labels.customer}: $name", L, R, after, paint(10.5f, true), rtl)
+                c.textEnd(labels.credit, L, R, after, paint(10.5f, true, Color.rgb(180, 83, 9)), rtl)
+            }
             return after + 18
         }
 
@@ -317,7 +326,7 @@ object InvoicePdf {
         fun draw() {
             val infoLines = listOf(profile.address, profile.phone, profile.email, profile.taxNumber).count { it.isNotBlank() }
             val height = (20 + (if (logo != null) 70 else 0) + 26 + infoLines * 13 + 80 +
-                data.lines.size * 30 + 70 + (if (profile.showStamp) 130 else 0) + 30)
+                data.lines.size * 30 + 70 + (if (data.creditCustomer != null) 24 else 0) + (if (profile.showStamp) 130 else 0) + 30)
             val page = doc.startPage(PdfDocument.PageInfo.Builder(RECEIPT_W, height, 1).create())
             val c = page.canvas
             var y = 14f
@@ -342,6 +351,12 @@ object InvoicePdf {
             c.textCenter("${labels.number}: ${data.number}", L, R, y, pSmall)
             y += 12
             c.textCenter(Dates.format(data.time), L, R, y, pSmall)
+            data.creditCustomer?.let { name ->
+                y += 12
+                c.textCenter("${labels.customer}: $name", L, R, y, paint(8.5f, true))
+                y += 12
+                c.textCenter(labels.credit, L, R, y, paint(8.5f, true))
+            }
             y += 8
             c.drawLine(L, y, R, y, dash)
             y += 14

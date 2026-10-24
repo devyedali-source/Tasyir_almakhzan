@@ -82,6 +82,7 @@ fun InvoiceScreen(dao: ShopDao, shopId: Long, opId: Long?, onBack: () -> Unit) {
                 InvoiceData(
                     number = op.id, time = op.time,
                     lines = dao.lines(op.id).map { InvoiceLine(it.productName, it.qty, it.unitPrice) },
+                    creditCustomer = op.customerId?.let { dao.customerNow(it)?.name },
                 )
             }
             val name = if (opId == null) "invoice_preview.pdf" else "invoice_${opId}.pdf"

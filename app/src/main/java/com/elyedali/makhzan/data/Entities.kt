@@ -44,17 +44,24 @@ object OpType {
     const val SALE = "SALE"
     const val PURCHASE = "PURCHASE"
     const val EXPENSE = "EXPENSE"
+    /** تسديد زبون لجزء من دينه أو كله (يدخل الصندوق) */
+    const val PAYMENT = "PAYMENT"
 
     fun label(type: String) = when (type) {
         SALE -> tr("بيع")
         PURCHASE -> tr("شراء")
         EXPENSE -> tr("مصروف")
+        PAYMENT -> tr("تسديد دَين")
         else -> type
     }
 }
 
-/** عملية في الصندوق: بيع (+) أو شراء (−) أو مصروف (−). */
-@Entity(tableName = "operations", indices = [Index("shopId"), Index("time")])
+/**
+ * عملية في الصندوق: بيع نقدي (+)، تسديد دين (+)، شراء (−)، مصروف (−).
+ * البيع بالدَّين (customerId غير فارغ) يُنقص المخزون ويُحسب في المبيعات والربح،
+ * لكنه لا يدخل الصندوق حتى يسدده الزبون.
+ */
+@Entity(tableName = "operations", indices = [Index("shopId"), Index("time"), Index("customerId")])
 data class Operation(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val shopId: Long,
@@ -62,6 +69,34 @@ data class Operation(
     val total: Long,
     val note: String,
     val time: Long,
+    /** الزبون في البيع بالدَّين وفي التسديد (أُضيف في الإصدار 4) */
+    val customerId: Long? = null,
+)
+
+// خارج الكيان حتى لا تعتبرها قاعدة البيانات أعمدة
+val Operation.isCredit: Boolean get() = type == OpType.SALE && customerId != null
+
+/** أثر العملية على الصندوق */
+val Operation.cashEffect: Long
+    get() = when {
+        isCredit -> 0L
+        type == OpType.SALE || type == OpType.PAYMENT -> total
+        else -> -total
+    }
+
+/** زبون يشتري بالدَّين (الإصدار 4) */
+@Entity(tableName = "customers", indices = [Index("shopId")])
+data class Customer(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val shopId: Long,
+    val name: String,
+    val phone: String,
+    val createdAt: Long,
+)
+
+data class CustomerDebt(
+    @Embedded val customer: Customer,
+    val debt: Long,
 )
 
 /** سطر من عملية بيع أو شراء: هو أيضًا حركة المخزون للمنتج. */
