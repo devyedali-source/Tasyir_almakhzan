@@ -12,8 +12,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * أي تغيير مستقبلي في الجداول يكون بترحيل (Migration) يحفظ بيانات التاجر.
  */
 @Database(
-    entities = [Shop::class, Product::class, Operation::class, OperationLine::class, ShopProfile::class, Customer::class, Worker::class],
-    version = 5,
+    entities = [Shop::class, Product::class, Operation::class, OperationLine::class, ShopProfile::class, Customer::class, Worker::class, Supplier::class],
+    version = 6,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -67,6 +67,33 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * الإصدار 6: البيع بالوزن (الكميات بالألف + وحدة المنتج)، قيمة كل سطر محفوظة،
+         * التخفيض، المرتجعات، الموردون والشراء بالدَّين، وصلاحية التخفيض للعامل.
+         * الكميات القديمة (أعداد صحيحة) تُضرب في 1000 فتبقى كما هي تمامًا.
+         */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `products` ADD COLUMN `unit` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("UPDATE `products` SET `qty` = `qty` * 1000")
+                db.execSQL("ALTER TABLE `operation_lines` ADD COLUMN `amount` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `operation_lines` ADD COLUMN `costAmount` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE `operation_lines` SET `amount` = `unitPrice` * `qty`, `costAmount` = `unitCost` * `qty`")
+                db.execSQL("UPDATE `operation_lines` SET `qty` = `qty` * 1000")
+                db.execSQL("ALTER TABLE `operations` ADD COLUMN `discount` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `operations` ADD COLUMN `refId` INTEGER")
+                db.execSQL("ALTER TABLE `operations` ADD COLUMN `supplierId` INTEGER")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_operations_refId` ON `operations` (`refId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_operations_supplierId` ON `operations` (`supplierId`)")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `suppliers` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`shopId` INTEGER NOT NULL, `name` TEXT NOT NULL, `phone` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_suppliers_shopId` ON `suppliers` (`shopId`)")
+                db.execSQL("ALTER TABLE `workers` ADD COLUMN `canDiscount` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         const val FILE_NAME = "makhzan.db"
 
         @Volatile private var instance: AppDatabase? = null
@@ -74,7 +101,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(
                 context.applicationContext, AppDatabase::class.java, FILE_NAME
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { instance = it }
         }
 
         /** يغلق القاعدة قبل استبدال ملفها عند الاسترجاع من Drive */

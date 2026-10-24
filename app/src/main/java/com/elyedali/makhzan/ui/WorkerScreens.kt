@@ -141,6 +141,10 @@ fun WorkersScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onEnterWorkerM
                             Text(tr("يسمح له بالبيع بالدَّين"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                             Switch(checked = w.canCredit, onCheckedChange = { v -> scope.launch { dao.setWorkerCredit(w.id, v) } })
                         }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(tr("يسمح له بالتخفيض وتغيير السعر"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                            Switch(checked = w.canDiscount, onCheckedChange = { v -> scope.launch { dao.setWorkerDiscount(w.id, v) } })
+                        }
                         TextButton(onClick = { deleteFor = w }) {
                             Text(tr("حذف العامل"), color = MaterialTheme.colorScheme.error)
                         }
@@ -349,7 +353,7 @@ fun WorkerRoot(dao: ShopDao, shopId: Long, onExit: () -> Unit) {
                 dao, shopId,
                 onBack = { route = WRoute.Home },
                 onInvoice = { route = WRoute.Invoice(it) },
-                workerId = w.id, allowCredit = w.canCredit,
+                workerId = w.id, allowCredit = w.canCredit, allowDiscount = w.canDiscount,
             )
         }
         is WRoute.Invoice -> InvoiceScreen(dao, shopId, r.opId, onBack = { route = WRoute.Sale })

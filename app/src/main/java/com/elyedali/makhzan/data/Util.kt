@@ -67,9 +67,83 @@ object Money {
         BigDecimal.valueOf(minor, 2).stripTrailingZeros().toPlainString()
 }
 
+/**
+ * الكميات مخزنة بالألف (1000 = قطعة واحدة أو كيلو واحد) حتى يمكن البيع بالوزن (1.5 كغ = 1500)
+ * دون أخطاء الكسور العشرية.
+ */
 object Qty {
-    /** كمية صحيحة موجبة لا تتجاوز مليونًا في العملية الواحدة */
-    fun parse(text: String): Int? = text.trim().westernDigits().toIntOrNull()?.takeIf { it in 1..1_000_000 }
+    const val ONE = 1000L
+    private const val MAX = 1_000_000L * ONE
+
+    /** الوحدات المتاحة: فارغة = بالقطعة */
+    val units = listOf("", "kg", "l", "m")
+
+    fun isWeighed(unit: String) = unit.isNotEmpty()
+
+    fun unitLabel(unit: String): String = when (unit) {
+        "kg" -> tr("كغ")
+        "l" -> tr("لتر")
+        "m" -> tr("متر")
+        else -> tr("قطعة")
+    }
+
+    /** اسم الوحدة في اختيارها */
+    fun unitName(unit: String): String = when (unit) {
+        "kg" -> tr("بالكيلو")
+        "l" -> tr("باللتر")
+        "m" -> tr("بالمتر")
+        else -> tr("بالقطعة")
+    }
+
+    /**
+     * يحوّل الكمية المكتوبة إلى قيمة بالألف: بالقطعة أعداد صحيحة فقط، وبالوزن حتى 3 أرقام بعد الفاصلة.
+     * allowZero للجرد (الكمية الفعلية قد تكون صفرًا).
+     */
+    fun parse(text: String, unit: String = "", allowZero: Boolean = false): Long? {
+        val t = text.trim().replace(" ", "").westernDigits()
+        if (t.isEmpty()) return null
+        val bd = t.toBigDecimalOrNull() ?: return null
+        if (bd.signum() < 0 || (!allowZero && bd.signum() == 0)) return null
+        if (!isWeighed(unit) && bd.stripTrailingZeros().scale() > 0) return null
+        if (bd.stripTrailingZeros().scale() > 3) return null
+        val v = bd.movePointRight(3)
+        if (v > BigDecimal.valueOf(MAX)) return null
+        return v.setScale(0, RoundingMode.UNNECESSARY).longValueExact()
+    }
+
+    /** نص الكمية دون الوحدة: 3 أو 1.5 */
+    fun plain(q: Long): String = BigDecimal.valueOf(q, 3).stripTrailingZeros().toPlainString()
+
+    /** نص الكمية مع الوحدة للمنتجات الموزونة: «1.5 كغ»، وللقطع الرقم وحده */
+    fun format(q: Long, unit: String = ""): String =
+        if (isWeighed(unit)) "${plain(q)} ${unitLabel(unit)}" else plain(q)
+
+    fun toInput(q: Long): String = plain(q)
+
+    /** قيمة كمية بسعر الوحدة، مقرّبة لأقرب وحدة صغرى (الإشارة تتبع الكمية) */
+    fun amount(unitPrice: Long, q: Long): Long {
+        val neg = q < 0
+        val a = abs(q)
+        val v = BigDecimal.valueOf(unitPrice).multiply(BigDecimal.valueOf(a))
+            .divide(BigDecimal.valueOf(ONE), 0, RoundingMode.HALF_UP).toLong()
+        return if (neg) -v else v
+    }
+
+    /** متوسط مرجّح لتكلفة الوحدة بين مخزون قديم وكمية جديدة */
+    fun weightedCost(oldCost: Long, oldQty: Long, newCost: Long, newQty: Long): Long {
+        val o = oldQty.coerceAtLeast(0)
+        if (o + newQty <= 0) return newCost
+        return BigDecimal.valueOf(oldCost).multiply(BigDecimal.valueOf(o))
+            .add(BigDecimal.valueOf(newCost).multiply(BigDecimal.valueOf(newQty)))
+            .divide(BigDecimal.valueOf(o + newQty), 0, RoundingMode.HALF_UP).toLong()
+    }
+
+    /** نسبة من مبلغ: value × part ÷ whole مقرّبة (لتوزيع التخفيض على المرتجع) */
+    fun share(value: Long, part: Long, whole: Long): Long {
+        if (whole <= 0) return value
+        return BigDecimal.valueOf(value).multiply(BigDecimal.valueOf(part))
+            .divide(BigDecimal.valueOf(whole), 0, RoundingMode.HALF_UP).toLong()
+    }
 }
 
 object Dates {

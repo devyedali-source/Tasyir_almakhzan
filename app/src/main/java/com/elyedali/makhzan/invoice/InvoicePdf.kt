@@ -17,7 +17,8 @@ import com.elyedali.makhzan.data.ShopProfile
 import java.io.File
 import java.io.FileOutputStream
 
-data class InvoiceLine(val name: String, val qty: Int, val unitPrice: Long)
+/** qty بالألف؛ amount قيمة السطر كما سُجّلت */
+data class InvoiceLine(val name: String, val qty: Long, val unitPrice: Long, val amount: Long, val unit: String = "")
 
 data class InvoiceData(
     val number: Long,
@@ -25,8 +26,10 @@ data class InvoiceData(
     val lines: List<InvoiceLine>,
     /** اسم الزبون في البيع بالدَّين (null = بيع نقدي) */
     val creditCustomer: String? = null,
+    val discount: Long = 0,
 ) {
-    val total: Long get() = lines.sumOf { it.unitPrice * it.qty }
+    val subtotal: Long get() = lines.sumOf { it.amount }
+    val total: Long get() = subtotal - discount
 }
 
 /** نصوص الفاتورة حسب اللغة: AR عربية، FR فرنسية، EN إنجليزية، BI مزدوجة (عربية + فرنسية) */
@@ -56,6 +59,22 @@ class Labels(val lang: String, customCurrency: String = "") {
     val itemsCount = t("عدد القطع", "Nb articles", "Items")
     val customer = t("الزبون", "Client", "Customer")
     val credit = t("بيع بالدَّين — غير مدفوع", "Vente à crédit — non payée", "Credit sale — unpaid")
+    val subtotal = t("المجموع قبل التخفيض", "Sous-total", "Subtotal")
+    val discount = t("التخفيض", "Remise", "Discount")
+    private val kg = t("كغ", "kg", "kg")
+    private val litre = t("لتر", "L", "L")
+    private val metre = t("متر", "m", "m")
+
+    /** الكمية بلغة الفاتورة: 3 أو 1.5 كغ */
+    fun qtyText(q: Long, unit: String): String {
+        val n = com.elyedali.makhzan.data.Qty.plain(q)
+        return when (unit) {
+            "kg" -> "$n $kg"
+            "l" -> "$n $litre"
+            "m" -> "$n $metre"
+            else -> n
+        }
+    }
 
     fun money(v: Long) = "${Money.format(v, withCurrency = false)} $currency"
     fun plain(v: Long) = Money.format(v, withCurrency = false)
@@ -276,7 +295,7 @@ object InvoicePdf {
             data.lines.forEachIndexed { idx, line ->
                 if (y + rowH > A4_H - 60) newPage()
                 if (modern && idx % 2 == 1) c.drawRect(L, y, R, y + rowH, zebra)
-                val values = listOf(line.name, line.qty.toString(), labels.plain(line.unitPrice), labels.plain(line.unitPrice * line.qty))
+                val values = listOf(line.name, labels.qtyText(line.qty, line.unit), labels.plain(line.unitPrice), labels.plain(line.amount))
                 for (i in 0..3) {
                     val (l, r) = col(i)
                     if (i == 0) c.textStart(values[i], l + 6, r - 6, y + 15, p, rtl)
@@ -286,10 +305,20 @@ object InvoicePdf {
                 if (modern) c.drawLine(L, y + rowH, R, y + rowH, border)
                 y += rowH
             }
-            // المجموع ثم الطابع: نحتاج حوالي 190 نقطة
-            if (y + 190 > A4_H - 40) { doc.finishPage(page); pageNo++; page = doc.startPage(PdfDocument.PageInfo.Builder(A4_W, A4_H, pageNo).create()); c = page.canvas; y = 50f }
+            // المجموع ثم الطابع: نحتاج حوالي 240 نقطة
+            if (y + 240 > A4_H - 40) { doc.finishPage(page); pageNo++; page = doc.startPage(PdfDocument.PageInfo.Builder(A4_W, A4_H, pageNo).create()); c = page.canvas; y = 50f }
             y += 12
             val boxW = 230f
+            if (data.discount > 0) {
+                val bL = if (rtl) L else R - boxW
+                val bR = if (rtl) L + boxW else R
+                c.textStart(labels.subtotal, bL + 8, bR - 8, y + 14, paint(10.5f), rtl)
+                c.textEnd(labels.money(data.subtotal), bL + 8, bR - 8, y + 14, paint(10.5f), rtl)
+                y += 18
+                c.textStart(labels.discount, bL + 8, bR - 8, y + 14, paint(10.5f), rtl)
+                c.textEnd("-" + labels.money(data.discount), bL + 8, bR - 8, y + 14, paint(10.5f), rtl)
+                y += 24
+            }
             val box = if (rtl) RectF(L, y, L + boxW, y + 30) else RectF(R - boxW, y, R, y + 30)
             c.drawRect(box, Paint().apply { color = if (modern) accent else Color.rgb(235, 235, 235) })
             val tColor = if (modern) Color.WHITE else ink
@@ -297,7 +326,7 @@ object InvoicePdf {
             c.textEnd(labels.money(data.total), box.left + 8, box.right - 8, y + 20, paint(12f, true, tColor), rtl)
             val countL = if (rtl) L + boxW + 10 else L
             val countR = if (rtl) R else R - boxW - 10
-            c.textStart("${labels.itemsCount}: ${data.lines.sumOf { it.qty }}", countL, countR, y + 20, paint(10f), rtl)
+            c.textStart("${labels.itemsCount}: ${data.lines.size}", countL, countR, y + 20, paint(10f), rtl)
             y += 50
             if (profile.showStamp) {
                 val r = 58f
@@ -326,7 +355,7 @@ object InvoicePdf {
         fun draw() {
             val infoLines = listOf(profile.address, profile.phone, profile.email, profile.taxNumber).count { it.isNotBlank() }
             val height = (20 + (if (logo != null) 70 else 0) + 26 + infoLines * 13 + 80 +
-                data.lines.size * 30 + 70 + (if (data.creditCustomer != null) 24 else 0) + (if (profile.showStamp) 130 else 0) + 30)
+                data.lines.size * 30 + 70 + (if (data.discount > 0) 30 else 0) + (if (data.creditCustomer != null) 24 else 0) + (if (profile.showStamp) 130 else 0) + 30)
             val page = doc.startPage(PdfDocument.PageInfo.Builder(RECEIPT_W, height, 1).create())
             val c = page.canvas
             var y = 14f
@@ -365,12 +394,20 @@ object InvoicePdf {
             for (line in data.lines) {
                 c.textStart(line.name, L, R, y, pItem, rtl)
                 y += 13
-                c.textStart("${line.qty} × ${labels.plain(line.unitPrice)}", L, R, y, pDet, rtl)
-                c.textEnd(labels.plain(line.unitPrice * line.qty), L, R, y, pDet, rtl)
+                c.textStart("${labels.qtyText(line.qty, line.unit)} × ${labels.plain(line.unitPrice)}", L, R, y, pDet, rtl)
+                c.textEnd(labels.plain(line.amount), L, R, y, pDet, rtl)
                 y += 17
             }
             c.drawLine(L, y - 6, R, y - 6, dash)
             y += 12
+            if (data.discount > 0) {
+                c.textStart(labels.subtotal, L, R, y, pDet, rtl)
+                c.textEnd(labels.plain(data.subtotal), L, R, y, pDet, rtl)
+                y += 13
+                c.textStart(labels.discount, L, R, y, pDet, rtl)
+                c.textEnd("-" + labels.plain(data.discount), L, R, y, pDet, rtl)
+                y += 17
+            }
             c.textStart(labels.total, L, R, y, paint(11f, true), rtl)
             c.textEnd(labels.money(data.total), L, R, y, paint(11f, true), rtl)
             y += 22

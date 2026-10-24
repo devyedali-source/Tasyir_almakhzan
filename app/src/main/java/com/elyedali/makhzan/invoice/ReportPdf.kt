@@ -21,7 +21,10 @@ import com.elyedali.makhzan.data.Operation
 import com.elyedali.makhzan.data.Product
 import com.elyedali.makhzan.data.ProductSales
 import com.elyedali.makhzan.data.TrustedClock
-import com.elyedali.makhzan.data.isCredit
+import com.elyedali.makhzan.data.Qty
+import com.elyedali.makhzan.data.Supplier
+import com.elyedali.makhzan.data.SupplierDebt
+import com.elyedali.makhzan.data.title
 import com.elyedali.makhzan.i18n.I18n
 import com.elyedali.makhzan.i18n.tr
 import java.io.File
@@ -36,11 +39,21 @@ data class PeriodSummary(
     val cashSales: Long,
     val creditSales: Long,
     val payments: Long,
+    /** مرتجعات رُدّ ثمنها نقدًا */
+    val cashReturns: Long,
+    /** مرتجعات أنقصت ديون الزبائن */
+    val creditReturns: Long,
+    /** المشتريات النقدية */
     val purchases: Long,
+    val creditPurchases: Long,
+    val supplierPayments: Long,
     val expenses: Long,
+    val discounts: Long,
+    /** خسائر المخزون بسعر الشراء (التالف والضائع وفروق الجرد) */
+    val adjustLoss: Long,
     val profit: Long,
 ) {
-    val netProfit: Long get() = profit - expenses
+    val netProfit: Long get() = profit - expenses - adjustLoss
 }
 
 /**
@@ -153,6 +166,8 @@ object ReportPdf {
         daily: List<DaySales>,
         expenses: List<NamedTotal>,
         bySeller: List<Pair<String, WorkerSales>> = emptyList(),
+        adjustments: List<ProductSales> = emptyList(),
+        suppliers: Map<Long, Supplier> = emptyMap(),
     ): File {
         val doc = PdfDocument()
         try {
@@ -163,13 +178,21 @@ object ReportPdf {
             w.row(tr("رصيد بداية الفترة"), Money.format(s.openingCash))
             w.row(tr("المبيعات النقدية"), "+" + Money.format(s.cashSales))
             w.row(tr("مقبوضات الديون"), "+" + Money.format(s.payments))
-            w.row(tr("المشتريات"), "−" + Money.format(s.purchases))
+            if (s.cashReturns != 0L) w.row(tr("مرتجعات رُدّ ثمنها نقدًا"), "−" + Money.format(s.cashReturns))
+            w.row(tr("المشتريات النقدية"), "−" + Money.format(s.purchases))
+            if (s.supplierPayments != 0L) w.row(tr("المدفوع للموردين"), "−" + Money.format(s.supplierPayments))
             w.row(tr("المصاريف"), "−" + Money.format(s.expenses))
             w.row(tr("رصيد نهاية الفترة"), Money.format(s.closingCash), bold = true)
             w.section(tr("النتيجة"))
-            w.row(tr("مجموع المبيعات (نقدًا وبالدَّين)"), Money.format(s.cashSales + s.creditSales))
+            val net = s.cashSales + s.creditSales - s.cashReturns - s.creditReturns
+            w.row(tr("صافي المبيعات (بعد المرتجعات)"), Money.format(net))
             w.row(tr("منها بالدَّين"), Money.format(s.creditSales))
+            if (s.cashReturns + s.creditReturns != 0L) w.row(tr("المرتجعات"), Money.format(s.cashReturns + s.creditReturns))
+            if (s.discounts != 0L) w.row(tr("التخفيضات الممنوحة"), Money.format(s.discounts))
+            if (s.creditPurchases != 0L) w.row(tr("المشتريات بالدَّين"), Money.format(s.creditPurchases))
             w.row(tr("ربح المبيعات"), Money.format(s.profit))
+            w.row(tr("المصاريف"), "−" + Money.format(s.expenses))
+            if (s.adjustLoss != 0L) w.row(tr("خسائر المخزون"), "−" + Money.format(s.adjustLoss))
             w.row(tr("الربح الصافي"), Money.format(s.netProfit), bold = true)
 
             if (top.isNotEmpty()) {
@@ -177,7 +200,15 @@ object ReportPdf {
                 w.table(
                     listOf(tr("المنتج"), tr("الكمية"), tr("المبلغ"), tr("الربح")),
                     listOf(0.46f, 0.14f, 0.20f, 0.20f),
-                    top.map { listOf(it.name, it.qty.toString(), Money.format(it.amount, false), Money.format(it.profit, false)) },
+                    top.map { listOf(it.name, Qty.plain(it.qty), Money.format(it.amount, false), Money.format(it.profit, false)) },
+                )
+            }
+            if (adjustments.isNotEmpty()) {
+                w.section(tr("خسائر المخزون حسب المنتج"))
+                w.table(
+                    listOf(tr("المنتج"), tr("الفرق"), tr("القيمة")),
+                    listOf(0.50f, 0.20f, 0.30f),
+                    adjustments.map { listOf(it.name, Qty.plain(it.qty), Money.format(it.amount, false)) },
                 )
             }
             if (bySeller.size > 1 || bySeller.any { it.second.workerId != null }) {
@@ -210,9 +241,8 @@ object ReportPdf {
                 listOf(tr("التاريخ"), tr("العملية"), tr("المبلغ")),
                 listOf(0.34f, 0.40f, 0.26f),
                 ops.map { op ->
-                    val who = op.customerId?.let { customers[it]?.name }
-                    val kind = (if (op.isCredit) tr("بيع بالدَّين") else OpType.label(op.type)) +
-                        (who?.let { " — $it" } ?: "") + (if (op.note.isNotBlank()) " — ${op.note}" else "")
+                    val who = op.customerId?.let { customers[it]?.name } ?: op.supplierId?.let { suppliers[it]?.name }
+                    val kind = op.title() + (who?.let { " — $it" } ?: "") + (if (op.note.isNotBlank()) " — ${op.note}" else "")
                     listOf(Dates.format(op.time), kind, Money.format(op.total, false))
                 },
             )
@@ -225,7 +255,7 @@ object ReportPdf {
     }
 
     /** تقرير الديون: كل الزبائن الذين عليهم مبالغ، الأكبر أولًا */
-    fun debts(context: Context, shopName: String, list: List<CustomerDebt>): File {
+    fun debts(context: Context, shopName: String, list: List<CustomerDebt>, suppliers: List<SupplierDebt> = emptyList()): File {
         val doc = PdfDocument()
         try {
             val w = Writer(doc, shopName, tr("تقرير الديون"), Dates.format(TrustedClock.now()))
@@ -241,6 +271,16 @@ object ReportPdf {
                 listOf(0.44f, 0.26f, 0.30f),
                 owing.map { listOf(it.customer.name, it.customer.phone, Money.format(it.debt, false)) },
             )
+            val owed = suppliers.filter { it.debt > 0 }
+            if (owed.isNotEmpty()) {
+                w.section(tr("ما على المحل للموردين"))
+                w.row(tr("المجموع"), Money.format(owed.sumOf { it.debt }), bold = true)
+                w.table(
+                    listOf(tr("المورد"), tr("الهاتف"), tr("المتبقي")),
+                    listOf(0.44f, 0.26f, 0.30f),
+                    owed.map { listOf(it.supplier.name, it.supplier.phone, Money.format(it.debt, false)) },
+                )
+            }
             val f = out(context, "report_debts.pdf")
             w.finish(f)
             return f
@@ -257,12 +297,16 @@ object ReportPdf {
             w.newPage()
             var balance = 0L
             val rows = ops.map { op ->
-                val isPayment = op.type == OpType.PAYMENT
-                balance += if (isPayment) -op.total else op.total
+                val effect = if (op.type == OpType.SALE) op.total else -op.total
+                balance += effect
                 listOf(
                     Dates.format(op.time),
-                    if (isPayment) tr("تسديد") else tr("شراء بالدَّين"),
-                    (if (isPayment) "−" else "+") + Money.format(op.total, false),
+                    when (op.type) {
+                        OpType.SALE -> tr("شراء بالدَّين")
+                        OpType.PAYMENT -> if (op.total < 0) tr("ردّ مال لزبون") else tr("تسديد")
+                        else -> tr("مرتجع")
+                    },
+                    (if (effect >= 0) "+" else "−") + Money.format(kotlin.math.abs(effect), false),
                     Money.format(balance, false),
                 )
             }
@@ -291,7 +335,7 @@ object ReportPdf {
             val now = TrustedClock.now()
             val w = Writer(doc, shopName, tr("تقرير التموين والسلع الراكدة"), Dates.format(now))
             w.newPage()
-            val low = list.filter { it.product.qty <= RESTOCK_LEVEL }
+            val low = list.filter { it.product.qty <= RESTOCK_LEVEL * Qty.ONE }
             val slowLimit = now - 30L * 86_400_000L
             val slow = list.filter { it.product.qty > 0 && (it.lastSale ?: 0L) < slowLimit && it.product.createdAt < slowLimit }
             w.section(tr("منتجات تحتاج إعادة تموين (%1\$s قطع أو أقل)", RESTOCK_LEVEL))
@@ -300,7 +344,7 @@ object ReportPdf {
                 listOf(tr("المنتج"), tr("الكمية"), tr("متوسط الشراء"), tr("آخر بيع")),
                 listOf(0.42f, 0.14f, 0.20f, 0.24f),
                 low.map {
-                    listOf(it.product.name, it.product.qty.toString(), Money.format(it.product.buyPrice, false),
+                    listOf(it.product.name, Qty.format(it.product.qty, it.product.unit), Money.format(it.product.buyPrice, false),
                         it.lastSale?.let { t -> Dates.formatDay(t) } ?: "—")
                 },
             )
@@ -310,13 +354,13 @@ object ReportPdf {
                 listOf(tr("المنتج"), tr("الكمية"), tr("القيمة"), tr("آخر بيع")),
                 listOf(0.42f, 0.14f, 0.20f, 0.24f),
                 slow.map {
-                    listOf(it.product.name, it.product.qty.toString(),
-                        Money.format(it.product.qty.toLong() * it.product.buyPrice, false),
+                    listOf(it.product.name, Qty.format(it.product.qty, it.product.unit),
+                        Money.format(Qty.amount(it.product.buyPrice, it.product.qty), false),
                         it.lastSale?.let { t -> Dates.formatDay(t) } ?: tr("لم يُبع"))
                 },
             )
             if (slow.isNotEmpty()) {
-                w.row(tr("مال مجمّد في السلع الراكدة"), Money.format(slow.sumOf { it.product.qty.toLong() * it.product.buyPrice }), bold = true)
+                w.row(tr("مال مجمّد في السلع الراكدة"), Money.format(slow.sumOf { Qty.amount(it.product.buyPrice, it.product.qty) }), bold = true)
             }
             val f = out(context, "report_restock.pdf")
             w.finish(f)
@@ -334,19 +378,21 @@ object ReportPdf {
         products: List<Product>,
         cashBalance: Long,
         totalDebt: Long,
+        supplierDebt: Long = 0,
     ): File {
         val doc = PdfDocument()
         try {
             val w = Writer(doc, shopName, tr("تقرير المخزون والوضع الراهن"), Dates.format(TrustedClock.now()))
             w.newPage()
-            val stockCost = products.sumOf { it.qty.toLong() * it.buyPrice }
-            val stockSell = products.sumOf { it.qty.toLong() * it.sellPrice }
+            val stockCost = products.sumOf { Qty.amount(it.buyPrice, it.qty) }
+            val stockSell = products.sumOf { Qty.amount(it.sellPrice, it.qty) }
             w.section(tr("الوضع الراهن"))
             w.row(tr("رصيد الصندوق"), Money.format(cashBalance))
             w.row(tr("الديون على الزبائن"), Money.format(totalDebt))
             w.row(tr("قيمة المخزون (بسعر الشراء)"), Money.format(stockCost))
             w.row(tr("قيمة المخزون (بسعر البيع)"), Money.format(stockSell))
-            w.row(tr("مجموع ما يملكه المحل"), Money.format(cashBalance + totalDebt + stockCost), bold = true)
+            if (supplierDebt != 0L) w.row(tr("على المحل للموردين"), "−" + Money.format(supplierDebt))
+            w.row(tr("صافي ما يملكه المحل"), Money.format(cashBalance + totalDebt + stockCost - supplierDebt), bold = true)
             w.row(tr("عدد المنتجات"), products.size.toString())
             w.row(tr("منتجات نفدت"), products.count { it.qty <= 0 }.toString())
 
@@ -356,8 +402,8 @@ object ReportPdf {
                 listOf(0.36f, 0.12f, 0.17f, 0.17f, 0.18f),
                 products.map {
                     listOf(
-                        it.name, it.qty.toString(), Money.format(it.buyPrice, false),
-                        Money.format(it.sellPrice, false), Money.format(it.qty.toLong() * it.buyPrice, false),
+                        it.name, Qty.format(it.qty, it.unit), Money.format(it.buyPrice, false),
+                        Money.format(it.sellPrice, false), Money.format(Qty.amount(it.buyPrice, it.qty), false),
                     )
                 },
             )

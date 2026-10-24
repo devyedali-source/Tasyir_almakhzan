@@ -38,6 +38,16 @@ object Prefs {
     fun shiftStart(c: Context, workerId: Long): Long = sp(c).getLong("shift_start_$workerId", 0L)
     fun setShiftStart(c: Context, workerId: Long, t: Long) = sp(c).edit().putLong("shift_start_$workerId", t).commit()
 
+    // ---------- طابعة البلوتوث (خاصة بهذا الهاتف) ----------
+    fun printerAddress(c: Context): String? = sp(c).getString("printer_address", null)
+    fun printerName(c: Context): String? = sp(c).getString("printer_name", null)
+    fun setPrinter(c: Context, name: String?, address: String?) =
+        sp(c).edit().putString("printer_name", name).putString("printer_address", address).commit()
+
+    /** عرض الطباعة بالنقاط: 384 (58 مم) أو 576 (80 مم) */
+    fun printerDots(c: Context): Int = sp(c).getInt("printer_dots", 384)
+    fun setPrinterDots(c: Context, v: Int) = sp(c).edit().putInt("printer_dots", v).commit()
+
     fun language(c: Context): String? = sp(c).getString("ui_language", null)
     fun setLanguage(c: Context, v: String) = sp(c).edit().putString("ui_language", v).commit()
 

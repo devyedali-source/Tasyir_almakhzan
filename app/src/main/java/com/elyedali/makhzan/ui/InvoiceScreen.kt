@@ -55,6 +55,13 @@ import com.elyedali.makhzan.data.ShopProfile
 import com.elyedali.makhzan.invoice.InvoiceData
 import com.elyedali.makhzan.invoice.InvoiceLine
 import com.elyedali.makhzan.invoice.InvoicePdf
+import com.elyedali.makhzan.print.ThermalPrinter
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -72,22 +79,38 @@ fun InvoiceScreen(dao: ShopDao, shopId: Long, opId: Long?, onBack: () -> Unit) {
     var file by remember { mutableStateOf<File?>(null) }
     var pages by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
+    var invoice by remember { mutableStateOf<InvoiceData?>(null) }
+    var printing by remember { mutableStateOf(false) }
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val hasPrinter = remember { ThermalPrinter.isConfigured(context) }
+    val btPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    fun printBluetooth() {
+        val data = invoice ?: return
+        if (!ThermalPrinter.hasPermission(context)) { btPermission.launch(ThermalPrinter.permission); return }
+        printing = true
+        scope.launch {
+            try {
+                printReceipt(context, dao, shopId, data)
+            } catch (e: Exception) {
+                snackbar.showSnackbar(e.message ?: tr("تعذر الطباعة"))
+            } finally {
+                printing = false
+            }
+        }
+    }
 
     LaunchedEffect(shopId, opId) {
         try {
             val shop = dao.shopNow(shopId) ?: run { error = tr("العملية غير موجودة (ربما أُلغيت)"); return@LaunchedEffect }
             val profile = dao.profileNow(shopId) ?: ShopProfile(shopId = shopId)
-            val data = if (opId == null) sampleInvoice() else {
-                val op = dao.operationNow(opId) ?: run { error = tr("العملية غير موجودة (ربما أُلغيت)"); return@LaunchedEffect }
-                InvoiceData(
-                    number = op.id, time = op.time,
-                    lines = dao.lines(op.id).map { InvoiceLine(it.productName, it.qty, it.unitPrice) },
-                    creditCustomer = op.customerId?.let { dao.customerNow(it)?.name },
-                )
-            }
+            val data = if (opId == null) sampleInvoice() else loadInvoice(dao, opId)
+                ?: run { error = tr("العملية غير موجودة (ربما أُلغيت)"); return@LaunchedEffect }
             val name = if (opId == null) "invoice_preview.pdf" else "invoice_${opId}.pdf"
             val f = withContext(Dispatchers.IO) { InvoicePdf.create(context, shop.name, profile, data, name) }
             pages = withContext(Dispatchers.IO) { renderPages(f) }
+            invoice = data
             file = f
         } catch (e: Exception) {
             error = tr("تعذر إنشاء الفاتورة: %1\$s", e.message ?: "")
@@ -96,6 +119,7 @@ fun InvoiceScreen(dao: ShopDao, shopId: Long, opId: Long?, onBack: () -> Unit) {
 
     Scaffold(
         topBar = { AppTopBar(if (opId == null) tr("معاينة تصميم الفاتورة") else tr("فاتورة رقم %1\$s", opId), onBack) },
+        snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             val f = file
             if (f != null) {
@@ -107,6 +131,13 @@ fun InvoiceScreen(dao: ShopDao, shopId: Long, opId: Long?, onBack: () -> Unit) {
                         Button(onClick = { sharePdf(context, f) }, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Share, contentDescription = null)
                             Text(tr("  مشاركة"))
+                        }
+                        // طابعة بلوتوث مختارة: طباعة مباشرة بضغطة؛ وإلا فطباعة أندرويد العادية
+                        if (hasPrinter && opId != null) {
+                            OutlinedButton(enabled = !printing, onClick = ::printBluetooth, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Default.Print, contentDescription = null)
+                                Text("  " + tr("إيصال"))
+                            }
                         }
                         OutlinedButton(onClick = { printPdf(context, f) }, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Print, contentDescription = null)
@@ -143,13 +174,26 @@ fun InvoiceScreen(dao: ShopDao, shopId: Long, opId: Long?, onBack: () -> Unit) {
     }
 }
 
-private fun sampleInvoice() = InvoiceData(
+/** بيانات فاتورة بيع من قاعدة البيانات (null إذا أُلغيت العملية) */
+internal suspend fun loadInvoice(dao: ShopDao, opId: Long): InvoiceData? {
+    val op = dao.operationNow(opId) ?: return null
+    return InvoiceData(
+        number = op.id, time = op.time,
+        lines = dao.lines(op.id).map {
+            InvoiceLine(it.productName, it.qty, it.unitPrice, it.amount, dao.productNow(it.productId)?.unit ?: "")
+        },
+        creditCustomer = op.customerId?.let { dao.customerNow(it)?.name },
+        discount = op.discount,
+    )
+}
+
+internal fun sampleInvoice() = InvoiceData(
     number = 1,
     time = TrustedClock.now(),
     lines = listOf(
-        InvoiceLine(tr("حليب مجفف 400غ"), 2, 15000),
-        InvoiceLine(tr("سكر 1 كغ"), 1, 4500),
-        InvoiceLine(tr("شاي أخضر"), 3, 2000),
+        InvoiceLine(tr("حليب مجفف 400غ"), 2000, 15000, 30000),
+        InvoiceLine(tr("أرز"), 1500, 4000, 6000, "kg"),
+        InvoiceLine(tr("شاي أخضر"), 3000, 2000, 6000),
     ),
 )
 

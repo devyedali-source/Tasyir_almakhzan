@@ -36,32 +36,57 @@ data class Product(
     val name: String,
     val buyPrice: Long,
     val sellPrice: Long,
-    val qty: Int,
+    /** الكمية بالألف (1000 = قطعة أو كيلو واحد) لتسمح بالبيع بالوزن مثل 1.5 كغ (الإصدار 6) */
+    val qty: Long,
     val createdAt: Long,
+    /** وحدة البيع: فارغة = قطعة، kg = كيلوغرام، l = لتر، m = متر (الإصدار 6) */
+    @ColumnInfo(defaultValue = "") val unit: String = "",
 )
 
 object OpType {
     const val SALE = "SALE"
     const val PURCHASE = "PURCHASE"
     const val EXPENSE = "EXPENSE"
-    /** تسديد زبون لجزء من دينه أو كله (يدخل الصندوق) */
+    /** تسديد زبون لجزء من دينه أو كله (يدخل الصندوق). المبلغ السالب = ردّ مال للزبون بعد إرجاع */
     const val PAYMENT = "PAYMENT"
+    /** إرجاع سلع من بيع سابق (refId = البيع الأصلي) */
+    const val RETURN = "RETURN"
+    /** تسوية المخزون: تالف، منتهي، ضائع، أو فرق الجرد. لا تمس الصندوق */
+    const val ADJUST = "ADJUST"
+    /** دفع المحل لمورد جزءًا من دينه أو كله (يخرج من الصندوق) */
+    const val SUPPLIER_PAYMENT = "SUPPLIER_PAYMENT"
 
     fun label(type: String) = when (type) {
         SALE -> tr("بيع")
         PURCHASE -> tr("شراء")
         EXPENSE -> tr("مصروف")
         PAYMENT -> tr("تسديد دَين")
+        RETURN -> tr("مرتجع")
+        ADJUST -> tr("تسوية مخزون")
+        SUPPLIER_PAYMENT -> tr("دفع لمورد")
         else -> type
     }
 }
+
+/** أثر كل عملية على الصندوق بلغة SQL (يطابق Operation.cashEffect) */
+const val CASH_CASE =
+    "CASE " +
+        "WHEN type = 'SALE' AND customerId IS NOT NULL THEN 0 " +
+        "WHEN type = 'RETURN' AND customerId IS NOT NULL THEN 0 " +
+        "WHEN type = 'PURCHASE' AND supplierId IS NOT NULL THEN 0 " +
+        "WHEN type = 'ADJUST' THEN 0 " +
+        "WHEN type IN ('SALE', 'PAYMENT') THEN total " +
+        "ELSE -total END"
 
 /**
  * عملية في الصندوق: بيع نقدي (+)، تسديد دين (+)، شراء (−)، مصروف (−).
  * البيع بالدَّين (customerId غير فارغ) يُنقص المخزون ويُحسب في المبيعات والربح،
  * لكنه لا يدخل الصندوق حتى يسدده الزبون.
  */
-@Entity(tableName = "operations", indices = [Index("shopId"), Index("time"), Index("customerId"), Index("workerId")])
+@Entity(
+    tableName = "operations",
+    indices = [Index("shopId"), Index("time"), Index("customerId"), Index("workerId"), Index("refId"), Index("supplierId")],
+)
 data class Operation(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val shopId: Long,
@@ -73,18 +98,52 @@ data class Operation(
     val customerId: Long? = null,
     /** العامل الذي سجّل العملية؛ null = صاحب المحل (أُضيف في الإصدار 5) */
     val workerId: Long? = null,
+    /** التخفيض على البيع (total = مجموع السطور − التخفيض) (الإصدار 6) */
+    @ColumnInfo(defaultValue = "0") val discount: Long = 0,
+    /** العملية المرتبطة: البيع الأصلي للمرتجع، أو المرتجع لردّ المال (الإصدار 6) */
+    val refId: Long? = null,
+    /** المورد في الشراء بالدَّين وفي الدفع له (الإصدار 6) */
+    val supplierId: Long? = null,
 )
 
 // خارج الكيان حتى لا تعتبرها قاعدة البيانات أعمدة
 val Operation.isCredit: Boolean get() = type == OpType.SALE && customerId != null
 
+/** شراء بالدَّين من مورد (لا يخرج من الصندوق حتى يُدفع) */
+val Operation.isCreditPurchase: Boolean get() = type == OpType.PURCHASE && supplierId != null
+
 /** أثر العملية على الصندوق */
 val Operation.cashEffect: Long
     get() = when {
-        isCredit -> 0L
+        isCredit || isCreditPurchase || type == OpType.ADJUST -> 0L
+        type == OpType.RETURN && customerId != null -> 0L
         type == OpType.SALE || type == OpType.PAYMENT -> total
         else -> -total
     }
+
+/** وصف العملية للعرض */
+fun Operation.title(): String = when {
+    isCredit -> tr("بيع بالدَّين")
+    isCreditPurchase -> tr("شراء بالدَّين")
+    type == OpType.PAYMENT && total < 0 -> tr("ردّ مال لزبون")
+    type == OpType.RETURN && customerId != null -> tr("مرتجع من دَين")
+    else -> OpType.label(type)
+}
+
+/** مورد يبيع للمحل بالدَّين (الإصدار 6) */
+@Entity(tableName = "suppliers", indices = [Index("shopId")])
+data class Supplier(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val shopId: Long,
+    val name: String,
+    val phone: String,
+    val createdAt: Long,
+)
+
+data class SupplierDebt(
+    @Embedded val supplier: Supplier,
+    val debt: Long,
+)
 
 /** زبون يشتري بالدَّين (الإصدار 4) */
 @Entity(tableName = "customers", indices = [Index("shopId")])
@@ -107,6 +166,8 @@ data class Worker(
     /** هل يُسمح له بالبيع بالدَّين */
     val canCredit: Boolean,
     val createdAt: Long,
+    /** هل يُسمح له بالتخفيض وتغيير السعر عند البيع (الإصدار 6) */
+    @ColumnInfo(defaultValue = "0") val canDiscount: Boolean = false,
 )
 
 data class WorkerSales(val workerId: Long?, val count: Long, val amount: Long)
@@ -120,6 +181,12 @@ data class ProductSales(
 
 data class DaySales(val day: String, val amount: Long, val profit: Long)
 
+/** مبلغ يومي واحد (لتركيب المبيعات اليومية) */
+data class DayAmount(val day: String, val amount: Long)
+
+/** كمية سبق إرجاعها من كل منتج في بيع معين */
+data class ReturnedQty(val productId: Long, val qty: Long, val amount: Long)
+
 data class NamedTotal(val name: String, val count: Long, val amount: Long)
 
 data class ProductLastSale(
@@ -132,7 +199,11 @@ data class CustomerDebt(
     val debt: Long,
 )
 
-/** سطر من عملية بيع أو شراء: هو أيضًا حركة المخزون للمنتج. */
+/**
+ * سطر من عملية: هو أيضًا حركة المخزون للمنتج.
+ * qty بالألف؛ وفي التسوية تكون سالبة للنقص وموجبة للزيادة.
+ * amount = قيمة السطر بسعره (مقرّبة)، costAmount = قيمته بالتكلفة: يُخزَّنان لتكون كل الحسابات مطابقة تمامًا.
+ */
 @Entity(tableName = "operation_lines", indices = [Index("opId"), Index("productId")])
 data class OperationLine(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -140,11 +211,13 @@ data class OperationLine(
     val productId: Long,
     val productName: String,
     val barcode: String,
-    val qty: Int,
+    val qty: Long,
     /** سعر الوحدة في هذه العملية (سعر البيع في البيع، سعر الشراء في الشراء) */
     val unitPrice: Long,
     /** تكلفة الوحدة وقت العملية (لحساب الربح) */
     val unitCost: Long,
+    @ColumnInfo(defaultValue = "0") val amount: Long = 0,
+    @ColumnInfo(defaultValue = "0") val costAmount: Long = 0,
 )
 
 data class LineWithOp(
@@ -158,7 +231,7 @@ data class SaleItem(
     val productId: Long,
     val name: String,
     val barcode: String,
-    val qty: Int,
+    val qty: Long,
     val unitPrice: Long,
     val unitCost: Long,
 )
@@ -170,7 +243,8 @@ data class PurchaseItem(
     val name: String,
     val buyPrice: Long,
     val sellPrice: Long,
-    val qty: Int,
+    val qty: Long,
+    val unit: String = "",
 )
 
 /** معلومات المحل التي تظهر على الفواتير وإعدادات الفاتورة (جدول أضيف في الإصدار 2 من القاعدة) */

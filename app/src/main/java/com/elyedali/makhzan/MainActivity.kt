@@ -75,6 +75,9 @@ import com.elyedali.makhzan.ui.SettingsScreen
 import com.elyedali.makhzan.ui.ShopHomeScreen
 import com.elyedali.makhzan.ui.ShopsScreen
 import com.elyedali.makhzan.ui.StockScreen
+import com.elyedali.makhzan.ui.StocktakeScreen
+import com.elyedali.makhzan.ui.SupplierDetailScreen
+import com.elyedali.makhzan.ui.SuppliersScreen
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -97,6 +100,9 @@ sealed interface Route {
     data class Reports(val shopId: Long) : Route
     data class PdfView(val shopId: Long, val path: String, val title: String) : Route
     data class CustomerDetail(val shopId: Long, val customerId: Long) : Route
+    data class Stocktake(val shopId: Long) : Route
+    data class Suppliers(val shopId: Long) : Route
+    data class SupplierDetail(val shopId: Long, val supplierId: Long) : Route
 }
 
 private fun Route.shopId(): Long? = when (this) {
@@ -112,6 +118,9 @@ private fun Route.shopId(): Long? = when (this) {
     is Route.Reports -> shopId
     is Route.PdfView -> shopId
     is Route.CustomerDetail -> shopId
+    is Route.Stocktake -> shopId
+    is Route.Suppliers -> shopId
+    is Route.SupplierDetail -> shopId
     else -> null
 }
 
@@ -400,7 +409,13 @@ private fun AppRoot(
         is Route.Sale -> SaleScreen(dao, r.shopId, onBack = ::back, onInvoice = { go(Route.Invoice(r.shopId, it)) })
         is Route.Purchase -> PurchaseScreen(dao, r.shopId, onBack = ::back)
         is Route.Cash -> CashScreen(dao, r.shopId, onBack = ::back, onInvoice = { go(Route.Invoice(r.shopId, it)) })
-        is Route.Stock -> StockScreen(dao, r.shopId, onBack = ::back, onOpen = { go(Route.ProductDetail(it)) })
+        is Route.Stock -> StockScreen(
+            dao, r.shopId, onBack = ::back, onOpen = { go(Route.ProductDetail(it)) },
+            onStocktake = { go(Route.Stocktake(r.shopId)) },
+        )
+        is Route.Stocktake -> StocktakeScreen(dao, r.shopId, onBack = ::back)
+        is Route.Suppliers -> SuppliersScreen(dao, r.shopId, onBack = ::back, onOpen = { go(Route.SupplierDetail(r.shopId, it)) })
+        is Route.SupplierDetail -> SupplierDetailScreen(dao, r.shopId, r.supplierId, onBack = ::back)
         is Route.ProductDetail -> ProductDetailScreen(dao, r.productId, onBack = ::back)
         is Route.Settings -> SettingsScreen(dao, r.shopId, onBack = ::back, onPreview = { go(Route.Invoice(r.shopId, null)) })
         is Route.Invoice -> InvoiceScreen(dao, r.shopId, r.opId, onBack = ::back)

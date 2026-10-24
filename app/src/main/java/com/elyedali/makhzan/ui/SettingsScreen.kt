@@ -188,6 +188,10 @@ fun SettingsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPreview: ()
                 Switch(checked = stamp, onCheckedChange = { stamp = it })
             }
 
+            HorizontalDivider()
+            SectionTitle(tr("طابعة البلوتوث (إيصالات حرارية)"))
+            PrinterSettings(dao, shopId, onMessage = { msg -> scope.launch { snackbar.showSnackbar(msg) } })
+
             Spacer(Modifier.size(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(modifier = Modifier.weight(1f), onClick = {

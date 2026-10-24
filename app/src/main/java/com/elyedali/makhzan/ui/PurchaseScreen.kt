@@ -17,6 +17,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -53,7 +57,8 @@ private data class PendingScan(
     val name: String,
     val buyPrice: Long?,
     val sellPrice: Long?,
-    val currentStock: Int?,
+    val currentStock: Long?,
+    val unit: String = "",
 )
 
 @Composable
@@ -85,10 +90,10 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
             val existing = dao.findByBarcode(shopId, code)
             when {
                 inCart != null -> pending = PendingScan(
-                    code, inCart.productId, inCart.name, inCart.buyPrice, inCart.sellPrice, existing?.qty
+                    code, inCart.productId, inCart.name, inCart.buyPrice, inCart.sellPrice, existing?.qty, inCart.unit,
                 )
                 existing != null -> pending = PendingScan(
-                    code, existing.id, existing.name, existing.buyPrice, existing.sellPrice, existing.qty
+                    code, existing.id, existing.name, existing.buyPrice, existing.sellPrice, existing.qty, existing.unit,
                 )
                 else -> {
                     // منتج جديد: نتحقق من حد المنتجات المسموح به لهذا المحل
@@ -109,7 +114,29 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
         }
     }
 
-    val total = cart.sumOf { it.buyPrice * it.qty }
+    val total = cart.sumOf { Qty.amount(it.buyPrice, it.qty) }
+    var showSupplierPicker by remember { mutableStateOf(false) }
+
+    /** supplierId = null: شراء نقدي من الصندوق؛ غير ذلك: بالدَّين على المحل لهذا المورد */
+    fun confirmPurchase(supplierId: Long?) {
+        busy = true
+        val items = cart.toList()
+        val sum = total
+        scope.launch {
+            try {
+                dao.recordPurchase(shopId, items, TrustedClock.now(), supplierId)
+                cart.clear()
+                toast(
+                    if (supplierId == null) tr("تم تسجيل الشراء: %1\$s", Money.format(sum))
+                    else tr("تم تسجيل الشراء بالدَّين: %1\$s", Money.format(sum))
+                )
+            } catch (e: Exception) {
+                toast(tr("تعذر تسجيل الشراء: %1\$s", e.message ?: ""))
+            } finally {
+                busy = false
+            }
+        }
+    }
 
     Scaffold(
         topBar = { AppTopBar(tr("شراء"), ::tryBack) },
@@ -128,26 +155,21 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                             fontWeight = FontWeight.Bold,
                         )
                     }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // الشراء بالدَّين من مورد: لا يخرج من الصندوق حتى يُدفع له
+                    OutlinedButton(
+                        enabled = cart.isNotEmpty() && !busy,
+                        modifier = Modifier.height(54.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        onClick = { showSupplierPicker = true },
+                    ) { Text(tr("دَين")) }
                     Button(
                         enabled = cart.isNotEmpty() && !busy,
                         modifier = Modifier.height(54.dp),
                         shape = RoundedCornerShape(16.dp),
-                        onClick = {
-                            busy = true
-                            val items = cart.toList()
-                            scope.launch {
-                                try {
-                                    dao.recordPurchase(shopId, items, TrustedClock.now())
-                                    cart.clear()
-                                    toast(tr("تم تسجيل الشراء: %1\$s", Money.format(total)))
-                                } catch (e: Exception) {
-                                    toast(tr("تعذر تسجيل الشراء: %1\$s", e.message ?: ""))
-                                } finally {
-                                    busy = false
-                                }
-                            }
-                        },
+                        onClick = { confirmPurchase(null) },
                     ) { Text(tr("تأكيد الشراء"), style = MaterialTheme.typography.titleMedium) }
+                    }
                 }
             }
         },
@@ -186,14 +208,15 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                     items(cart, key = { it.barcode }) { item ->
                         CartRow(
                             name = if (item.productId == null) tr("%1\$s (جديد)", item.name) else item.name,
-                            subtitle = tr("شراء %1\$s — بيع %2\$s", Money.format(item.buyPrice), Money.format(item.sellPrice)),
-                            lineTotal = Money.format(item.buyPrice * item.qty),
-                            qty = item.qty,
+                            subtitle = tr("شراء %1\$s — بيع %2\$s", Money.format(item.buyPrice), Money.format(item.sellPrice)) +
+                                if (Qty.isWeighed(item.unit)) " / " + Qty.unitLabel(item.unit) else "",
+                            lineTotal = Money.format(Qty.amount(item.buyPrice, item.qty)),
+                            qty = Qty.format(item.qty, item.unit),
                             onPlus = { onScanned(item.barcode) },
                             onMinus = {
                                 val i = cart.indexOfFirst { it.barcode == item.barcode }
                                 if (i >= 0) {
-                                    if (cart[i].qty <= 1) cart.removeAt(i) else cart[i] = cart[i].copy(qty = cart[i].qty - 1)
+                                    if (cart[i].qty <= Qty.ONE) cart.removeAt(i) else cart[i] = cart[i].copy(qty = cart[i].qty - Qty.ONE)
                                 }
                             },
                         )
@@ -207,13 +230,13 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
         PurchaseItemDialog(
             scan = p,
             onDismiss = { pending = null },
-            onConfirm = { name, buy, sell, qty ->
+            onConfirm = { name, buy, sell, qty, unit ->
                 pending = null
                 val i = cart.indexOfFirst { it.barcode == p.barcode }
                 if (i >= 0) {
-                    cart[i] = cart[i].copy(name = name, buyPrice = buy, sellPrice = sell, qty = cart[i].qty + qty)
+                    cart[i] = cart[i].copy(name = name, buyPrice = buy, sellPrice = sell, qty = cart[i].qty + qty, unit = unit)
                 } else {
-                    cart.add(0, PurchaseItem(p.productId, p.barcode, name, buy, sell, qty))
+                    cart.add(0, PurchaseItem(p.productId, p.barcode, name, buy, sell, qty, unit))
                 }
             },
         )
@@ -234,6 +257,13 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                 }) { Text(tr("تفعيل المحل")) }
             },
             dismissButton = { TextButton(onClick = { limitMessage = null }) { Text(tr("إغلاق")) } },
+        )
+    }
+    if (showSupplierPicker) {
+        SupplierPickerDialog(
+            dao, shopId, total,
+            onDismiss = { showSupplierPicker = false },
+            onPick = { id -> showSupplierPicker = false; confirmPurchase(id) },
         )
     }
     activationShop?.let { sh ->
@@ -259,9 +289,11 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
 private fun PurchaseItemDialog(
     scan: PendingScan,
     onDismiss: () -> Unit,
-    onConfirm: (name: String, buy: Long, sell: Long, qty: Int) -> Unit,
+    onConfirm: (name: String, buy: Long, sell: Long, qty: Long, unit: String) -> Unit,
 ) {
     val isNew = scan.productId == null && scan.name.isEmpty()
+    var unit by remember { mutableStateOf(scan.unit) }
+    val weighed = Qty.isWeighed(unit)
     var name by remember { mutableStateOf(scan.name) }
     var buy by remember { mutableStateOf(scan.buyPrice?.let { Money.toInput(it) } ?: "") }
     var sell by remember { mutableStateOf(scan.sellPrice?.let { Money.toInput(it) } ?: "") }
@@ -269,7 +301,7 @@ private fun PurchaseItemDialog(
 
     val buyV = Money.parse(buy)
     val sellV = Money.parse(sell)
-    val qtyV = Qty.parse(qty)
+    val qtyV = Qty.parse(qty, unit)
     val valid = name.isNotBlank() && buyV != null && sellV != null && qtyV != null
 
     AlertDialog(
@@ -279,24 +311,33 @@ private fun PurchaseItemDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(tr("الكود: %1\$s", scan.barcode), style = MaterialTheme.typography.bodySmall)
                 scan.currentStock?.let {
-                    Text(tr("الموجود في المخزون: %1\$s", it), style = MaterialTheme.typography.bodySmall)
+                    Text(tr("الموجود في المخزون: %1\$s", Qty.format(it, unit)), style = MaterialTheme.typography.bodySmall)
                 }
                 if (isNew) {
                     OutlinedTextField(
                         value = name, onValueChange = { name = it }, label = { Text(tr("اسم المنتج")) },
                         singleLine = true, modifier = Modifier.fillMaxWidth(),
                     )
+                    // طريقة البيع: بالقطعة أو بالوزن (أرز، سكر، زيت سائب…)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Qty.units.forEach { u ->
+                            FilterChip(selected = unit == u, onClick = { unit = u }, label = { Text(Qty.unitName(u)) })
+                        }
+                    }
                 }
-                MoneyField(buy, { buy = it }, tr("سعر الشراء للوحدة"))
-                MoneyField(sell, { sell = it }, tr("سعر البيع للوحدة"))
-                NumberField(qty, { qty = it }, tr("الكمية المشتراة"))
+                val per = if (weighed) tr("للـ%1\$s", Qty.unitLabel(unit)) else tr("للوحدة")
+                MoneyField(buy, { buy = it }, tr("سعر الشراء %1\$s", per))
+                MoneyField(sell, { sell = it }, tr("سعر البيع %1\$s", per))
+                if (weighed) MoneyField(qty, { qty = it }, tr("الكمية المشتراة (%1\$s)", Qty.unitLabel(unit)))
+                else NumberField(qty, { qty = it }, tr("الكمية المشتراة"))
+                if (qty.isNotBlank() && qtyV == null) ErrorText(if (weighed) tr("كمية غير صحيحة") else tr("اكتب عددًا صحيحًا من القطع"))
                 if (buyV != null && sellV != null && sellV < buyV) {
                     ErrorText(tr("تنبيه: سعر البيع أقل من سعر الشراء"))
                 }
             }
         },
         confirmButton = {
-            TextButton(enabled = valid, onClick = { onConfirm(name.trim(), buyV!!, sellV!!, qtyV!!) }) {
+            TextButton(enabled = valid, onClick = { onConfirm(name.trim(), buyV!!, sellV!!, qtyV!!, unit) }) {
                 Text(tr("إضافة"))
             }
         },

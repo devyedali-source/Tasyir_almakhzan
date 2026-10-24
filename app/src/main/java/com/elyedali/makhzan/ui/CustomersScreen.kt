@@ -239,22 +239,27 @@ fun CustomerDetailScreen(
             item { Text(tr("السجل"), style = MaterialTheme.typography.titleMedium) }
             if (ops.isEmpty()) item { Text(tr("لا توجد عمليات")) }
             items(ops, key = { it.id }) { op ->
-                val isPayment = op.type == OpType.PAYMENT
+                // أثر العملية على دين الزبون: البيع يزيده، والتسديد والمرتجع ينقصانه، وردّ المال يعيده إلى الصفر
+                val effect = if (op.type == OpType.SALE) op.total else -op.total
                 Card(
-                    onClick = { if (!isPayment) onInvoice(op.id) },
+                    onClick = { if (op.type == OpType.SALE) onInvoice(op.id) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                if (isPayment) tr("تسديد") else tr("شراء بالدَّين"),
+                                when (op.type) {
+                                    OpType.SALE -> tr("شراء بالدَّين")
+                                    OpType.PAYMENT -> if (op.total < 0) tr("ردّ مال لزبون") else tr("تسديد")
+                                    else -> tr("مرتجع")
+                                },
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(Dates.format(op.time), style = MaterialTheme.typography.bodySmall)
                         }
                         Text(
-                            (if (isPayment) "−" else "+") + Money.format(op.total),
-                            color = if (isPayment) PaidColor else DebtColor, fontWeight = FontWeight.Bold,
+                            (if (effect >= 0) "+" else "−") + Money.format(kotlin.math.abs(effect)),
+                            color = if (effect > 0) DebtColor else PaidColor, fontWeight = FontWeight.Bold,
                         )
                     }
                 }
@@ -311,6 +316,7 @@ fun CustomerFormDialog(
     title: String,
     initialName: String = "",
     initialPhone: String = "",
+    nameLabel: String = tr("اسم الزبون"),
     onDismiss: () -> Unit,
     onSave: (name: String, phone: String) -> Unit,
 ) {
@@ -323,7 +329,7 @@ fun CustomerFormDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = name, onValueChange = { name = it }, singleLine = true,
-                    label = { Text(tr("اسم الزبون")) }, modifier = Modifier.fillMaxWidth(),
+                    label = { Text(nameLabel) }, modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = phone, onValueChange = { phone = it }, singleLine = true,

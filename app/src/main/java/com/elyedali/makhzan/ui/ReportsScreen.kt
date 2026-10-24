@@ -84,17 +84,28 @@ fun ReportsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPdf: (path: 
         else -> minOf(customFrom, customTo) to nextDay(maxOf(customFrom, customTo))
     }
 
-    suspend fun compute(): PeriodSummary = PeriodSummary(
-        from = from, toExclusive = toExclusive,
-        openingCash = dao.balanceBefore(shopId, from),
-        closingCash = dao.balanceBefore(shopId, toExclusive),
-        cashSales = dao.sumTypeRange(shopId, OpType.SALE, from, toExclusive) - dao.creditSalesRange(shopId, from, toExclusive),
-        creditSales = dao.creditSalesRange(shopId, from, toExclusive),
-        payments = dao.sumTypeRange(shopId, OpType.PAYMENT, from, toExclusive),
-        purchases = dao.sumTypeRange(shopId, OpType.PURCHASE, from, toExclusive),
-        expenses = dao.sumTypeRange(shopId, OpType.EXPENSE, from, toExclusive),
-        profit = dao.profitRange(shopId, from, toExclusive),
-    )
+    suspend fun compute(): PeriodSummary {
+        val credit = dao.creditSalesRange(shopId, from, toExclusive)
+        val creditReturns = dao.creditReturnsRange(shopId, from, toExclusive)
+        val creditPurchases = dao.creditPurchasesRange(shopId, from, toExclusive)
+        return PeriodSummary(
+            from = from, toExclusive = toExclusive,
+            openingCash = dao.balanceBefore(shopId, from),
+            closingCash = dao.balanceBefore(shopId, toExclusive),
+            cashSales = dao.sumTypeRange(shopId, OpType.SALE, from, toExclusive) - credit,
+            creditSales = credit,
+            payments = dao.sumTypeRange(shopId, OpType.PAYMENT, from, toExclusive),
+            cashReturns = dao.sumTypeRange(shopId, OpType.RETURN, from, toExclusive) - creditReturns,
+            creditReturns = creditReturns,
+            purchases = dao.sumTypeRange(shopId, OpType.PURCHASE, from, toExclusive) - creditPurchases,
+            creditPurchases = creditPurchases,
+            supplierPayments = dao.sumTypeRange(shopId, OpType.SUPPLIER_PAYMENT, from, toExclusive),
+            expenses = dao.sumTypeRange(shopId, OpType.EXPENSE, from, toExclusive),
+            discounts = dao.discountsRange(shopId, from, toExclusive),
+            adjustLoss = dao.sumTypeRange(shopId, OpType.ADJUST, from, toExclusive),
+            profit = dao.profitRange(shopId, from, toExclusive),
+        )
+    }
 
     LaunchedEffect(from, toExclusive) { summary = compute() }
 
@@ -142,10 +153,15 @@ fun ReportsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPdf: (path: 
                     Line(tr("المبيعات النقدية"), s.cashSales, Color(0xFF0B6E4F))
                     Line(tr("المبيعات بالدَّين"), s.creditSales, Color(0xFFB45309))
                     Line(tr("مقبوضات الديون"), s.payments, Color(0xFF0B6E4F))
-                    Line(tr("المشتريات"), s.purchases, Color(0xFFC62828))
+                    if (s.cashReturns + s.creditReturns != 0L) Line(tr("المرتجعات"), s.cashReturns + s.creditReturns, Color(0xFFC62828))
+                    Line(tr("المشتريات النقدية"), s.purchases, Color(0xFFC62828))
+                    if (s.creditPurchases != 0L) Line(tr("المشتريات بالدَّين"), s.creditPurchases, Color(0xFF7B1FA2))
+                    if (s.supplierPayments != 0L) Line(tr("المدفوع للموردين"), s.supplierPayments, Color(0xFFC62828))
                     Line(tr("المصاريف"), s.expenses, Color(0xFFC62828))
                     Line(tr("رصيد نهاية الفترة"), s.closingCash, bold = true)
+                    if (s.discounts != 0L) Line(tr("التخفيضات الممنوحة"), s.discounts)
                     Line(tr("ربح المبيعات"), s.profit)
+                    if (s.adjustLoss != 0L) Line(tr("خسائر المخزون"), s.adjustLoss, Color(0xFFC62828))
                     Line(tr("الربح الصافي"), s.netProfit, if (s.netProfit < 0) Color(0xFFC62828) else Color(0xFF0B6E4F), bold = true)
                 }
             }
@@ -163,13 +179,15 @@ fun ReportsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPdf: (path: 
                         val customers = dao.customersNow(shopId).associateBy { it.id }
                         val daily = dao.dailySalesRange(shopId, from, toExclusive)
                         val exps = dao.expensesByNote(shopId, from, toExclusive)
+                        val adjustments = dao.adjustmentsRange(shopId, from, toExclusive)
+                        val suppliers = dao.suppliersNow(shopId).associateBy { it.id }
                         val workers = dao.workersNow(shopId).associateBy { it.id }
                         val bySeller = dao.salesByWorker(shopId, from, toExclusive).map { ws ->
                             val name = ws.workerId?.let { workers[it]?.name ?: tr("عامل محذوف") } ?: tr("صاحب المحل")
                             name to ws
                         }
                         val f = withContext(Dispatchers.IO) {
-                            ReportPdf.period(context, shop?.name ?: "", sum, top, ops, customers, daily, exps, bySeller)
+                            ReportPdf.period(context, shop?.name ?: "", sum, top, ops, customers, daily, exps, bySeller, adjustments, suppliers)
                         }
                         busy = false
                         onPdf(f.absolutePath, tr("تقرير الفترة"))
@@ -189,8 +207,9 @@ fun ReportsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPdf: (path: 
                         val products = dao.productsNow(shopId)
                         val balance = dao.balance(shopId).first()
                         val debt = dao.totalDebt(shopId).first()
+                        val owed = dao.totalSupplierDebt(shopId).first()
                         val f = withContext(Dispatchers.IO) {
-                            ReportPdf.stock(context, shop?.name ?: "", products, balance, debt)
+                            ReportPdf.stock(context, shop?.name ?: "", products, balance, debt, owed)
                         }
                         busy = false
                         onPdf(f.absolutePath, tr("تقرير المخزون والوضع الراهن"))
@@ -208,7 +227,8 @@ fun ReportsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPdf: (path: 
                     scope.launch {
                         val shop = dao.shopNow(shopId)
                         val list = dao.customersWithDebt(shopId).first()
-                        val f = withContext(Dispatchers.IO) { ReportPdf.debts(context, shop?.name ?: "", list) }
+                        val sup = dao.suppliersWithDebt(shopId).first()
+                        val f = withContext(Dispatchers.IO) { ReportPdf.debts(context, shop?.name ?: "", list, sup) }
                         busy = false
                         onPdf(f.absolutePath, tr("تقرير الديون"))
                     }

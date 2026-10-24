@@ -29,6 +29,9 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.LocalShipping
+import com.elyedali.makhzan.data.Qty
+import com.elyedali.makhzan.invoice.ReportPdf
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -72,7 +75,8 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
     val shop by dao.shop(shopId).collectAsState(initial = null)
     val today = remember { Dates.startOfToday() }
     val balance by dao.balance(shopId).collectAsState(initial = 0L)
-    val salesToday by dao.sumType(shopId, OpType.SALE, today).collectAsState(initial = 0L)
+    val salesToday by dao.netSales(shopId, today).collectAsState(initial = 0L)
+    val lowStock by dao.lowStockCount(shopId, ReportPdf.RESTOCK_LEVEL * Qty.ONE).collectAsState(initial = 0)
     val profitToday by dao.profit(shopId, today).collectAsState(initial = 0L)
     val count by dao.productCountFlow(shopId).collectAsState(initial = 0)
     var showExpense by remember { mutableStateOf(false) }
@@ -164,6 +168,26 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
                 }
             }
 
+            // تنبيه هادئ: منتجات قاربت على النفاد
+            if (lowStock > 0) {
+                Card(
+                    onClick = { go(Route.Stock(shopId)) },
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3CD)),
+                ) {
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Inventory2, contentDescription = null, tint = Color(0xFF8A5A00))
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            tr("%1\$s منتج قارب على النفاد أو نفد", lowStock),
+                            color = Color(0xFF8A5A00), fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f),
+                        )
+                        Text(tr("عرض"), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
             // العمليات الرئيسية
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 BigAction(tr("بيع"), Icons.Default.QrCodeScanner, Color(0xFF0B6E4F), Modifier.weight(1f)) {
@@ -199,8 +223,13 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
                     go(Route.Settings(shopId))
                 }
             }
-            SmallAction(tr("العمال ووضع البائع"), Icons.Default.Badge, Color(0xFF6D4C41), Modifier.fillMaxWidth()) {
-                go(Route.Workers(shopId))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SmallAction(tr("الموردون"), Icons.Default.LocalShipping, Color(0xFF7B1FA2), Modifier.weight(1f)) {
+                    go(Route.Suppliers(shopId))
+                }
+                SmallAction(tr("العمال"), Icons.Default.Badge, Color(0xFF6D4C41), Modifier.weight(1f)) {
+                    go(Route.Workers(shopId))
+                }
             }
         }
     }
