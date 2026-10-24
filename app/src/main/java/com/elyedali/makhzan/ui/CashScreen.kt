@@ -176,9 +176,11 @@ private fun OperationLinesDialog(dao: ShopDao, op: Operation, onDismiss: () -> U
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     var customerName by remember { mutableStateOf<String?>(null) }
+    var workerName by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(op.id) {
         lines = dao.lines(op.id)
         customerName = op.customerId?.let { dao.customerNow(it)?.name }
+        workerName = op.workerId?.let { dao.workerNow(it)?.name ?: tr("عامل محذوف") }
     }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -187,6 +189,7 @@ private fun OperationLinesDialog(dao: ShopDao, op: Operation, onDismiss: () -> U
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (op.note.isNotBlank()) Text(op.note)
                 customerName?.let { Text(tr("الزبون: %1\$s", it), fontWeight = FontWeight.SemiBold) }
+                workerName?.let { Text(tr("البائع: %1\$s", it)) }
                 lines.forEach { l ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("${l.productName} × ${l.qty}", modifier = Modifier.weight(1f))

@@ -50,6 +50,28 @@ object Auth {
         }
     }
 
+    /**
+     * يتحقق أن من يحمل الهاتف يملك حساب Google صاحب المحل، دون تغيير الحساب المسجَّل في التطبيق
+     * (يُستعمل حين ينسى صاحب المحل رمزه). يُرجع true إذا كان البريد هو نفسه.
+     */
+    suspend fun verifyOwnerAccount(activity: Activity): Boolean {
+        val expected = auth.currentUser?.email?.trim()?.lowercase() ?: return false
+        return try {
+            val option = GetGoogleIdOption.Builder()
+                .setFilterByAuthorizedAccounts(false)
+                .setServerClientId(activity.getString(R.string.default_web_client_id))
+                .setAutoSelectEnabled(false)
+                .build()
+            val result = CredentialManager.create(activity)
+                .getCredential(activity, GetCredentialRequest.Builder().addCredentialOption(option).build())
+            val cred = result.credential
+            cred is CustomCredential && cred.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL &&
+                GoogleIdTokenCredential.createFrom(cred.data).id.trim().lowercase() == expected
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     suspend fun signOut(activity: Activity) {
         auth.signOut()
         runCatching { CredentialManager.create(activity).clearCredentialState(ClearCredentialStateRequest()) }

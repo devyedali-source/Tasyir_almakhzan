@@ -163,8 +163,13 @@ fun ReportsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPdf: (path: 
                         val customers = dao.customersNow(shopId).associateBy { it.id }
                         val daily = dao.dailySalesRange(shopId, from, toExclusive)
                         val exps = dao.expensesByNote(shopId, from, toExclusive)
+                        val workers = dao.workersNow(shopId).associateBy { it.id }
+                        val bySeller = dao.salesByWorker(shopId, from, toExclusive).map { ws ->
+                            val name = ws.workerId?.let { workers[it]?.name ?: tr("عامل محذوف") } ?: tr("صاحب المحل")
+                            name to ws
+                        }
                         val f = withContext(Dispatchers.IO) {
-                            ReportPdf.period(context, shop?.name ?: "", sum, top, ops, customers, daily, exps)
+                            ReportPdf.period(context, shop?.name ?: "", sum, top, ops, customers, daily, exps, bySeller)
                         }
                         busy = false
                         onPdf(f.absolutePath, tr("تقرير الفترة"))

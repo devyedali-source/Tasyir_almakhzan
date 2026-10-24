@@ -30,7 +30,7 @@ class MakhzanApp : Application() {
 
         // كل تغيير في البيانات يطلب نسخة احتياطية في الخلفية على Drive
         db.invalidationTracker.addObserver(object : InvalidationTracker.Observer(
-            arrayOf("shops", "products", "operations", "operation_lines", "shop_profile", "customers")
+            arrayOf("shops", "products", "operations", "operation_lines", "shop_profile", "customers", "workers")
         ) {
             override fun onInvalidated(tables: Set<String>) {
                 DriveBackup.schedule(this@MakhzanApp)

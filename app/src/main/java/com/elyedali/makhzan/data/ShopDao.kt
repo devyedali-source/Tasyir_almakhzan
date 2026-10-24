@@ -190,6 +190,43 @@ abstract class ShopDao {
     @Query("SELECT * FROM customers WHERE shopId = :shopId")
     abstract suspend fun customersNow(shopId: Long): List<Customer>
 
+    // ---------- العمال (وضع البائع) ----------
+    @Query("SELECT * FROM workers WHERE shopId = :shopId ORDER BY name")
+    abstract fun workers(shopId: Long): Flow<List<Worker>>
+
+    @Query("SELECT * FROM workers WHERE shopId = :shopId")
+    abstract suspend fun workersNow(shopId: Long): List<Worker>
+
+    @Query("SELECT * FROM workers WHERE id = :id")
+    abstract suspend fun workerNow(id: Long): Worker?
+
+    @Insert
+    abstract suspend fun insertWorker(worker: Worker): Long
+
+    @Query("UPDATE workers SET canCredit = :canCredit WHERE id = :id")
+    abstract suspend fun setWorkerCredit(id: Long, canCredit: Boolean)
+
+    @Query("UPDATE workers SET pinHash = :pinHash WHERE id = :id")
+    abstract suspend fun setWorkerPin(id: Long, pinHash: String)
+
+    @Query("DELETE FROM workers WHERE id = :id")
+    abstract suspend fun deleteWorker(id: Long)
+
+    @Query("SELECT COUNT(*) FROM operations WHERE workerId = :workerId AND type = 'SALE' AND time >= :from")
+    abstract fun workerSaleCount(workerId: Long, from: Long): Flow<Int>
+
+    @Query("SELECT COALESCE(SUM(total), 0) FROM operations WHERE workerId = :workerId AND type = 'SALE' AND customerId IS NULL AND time >= :from")
+    abstract fun workerCashSales(workerId: Long, from: Long): Flow<Long>
+
+    @Query("SELECT COALESCE(SUM(total), 0) FROM operations WHERE workerId = :workerId AND type = 'SALE' AND customerId IS NOT NULL AND time >= :from")
+    abstract fun workerCreditSales(workerId: Long, from: Long): Flow<Long>
+
+    @Query(
+        "SELECT workerId, COUNT(*) AS count, SUM(total) AS amount FROM operations " +
+            "WHERE shopId = :shopId AND type = 'SALE' AND time >= :from AND time < :to GROUP BY workerId ORDER BY amount DESC"
+    )
+    abstract suspend fun salesByWorker(shopId: Long, from: Long, to: Long): List<WorkerSales>
+
     // ---------- الزبائن والديون ----------
     @Insert
     abstract suspend fun insertCustomer(customer: Customer): Long
@@ -265,7 +302,9 @@ abstract class ShopDao {
 
     /** يسجل البيع: ينقص المخزون ويدخل المبلغ في الصندوق. يرفض البيع إذا كانت الكمية غير كافية. */
     @Transaction
-    open suspend fun recordSale(shopId: Long, items: List<SaleItem>, time: Long, customerId: Long? = null): Long {
+    open suspend fun recordSale(
+        shopId: Long, items: List<SaleItem>, time: Long, customerId: Long? = null, workerId: Long? = null,
+    ): Long {
         require(items.isNotEmpty())
         for (item in items) {
             val p = productNow(item.productId)
@@ -276,7 +315,10 @@ abstract class ShopDao {
         }
         val total = items.sumOf { it.unitPrice * it.qty }
         val opId = insertOperation(
-            Operation(shopId = shopId, type = OpType.SALE, total = total, note = "", time = time, customerId = customerId)
+            Operation(
+                shopId = shopId, type = OpType.SALE, total = total, note = "", time = time,
+                customerId = customerId, workerId = workerId,
+            )
         )
         for (item in items) {
             insertLine(

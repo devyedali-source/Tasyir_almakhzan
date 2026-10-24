@@ -13,6 +13,7 @@ import com.elyedali.makhzan.data.CustomerDebt
 import com.elyedali.makhzan.data.DaySales
 import com.elyedali.makhzan.data.NamedTotal
 import com.elyedali.makhzan.data.ProductLastSale
+import com.elyedali.makhzan.data.WorkerSales
 import com.elyedali.makhzan.data.Dates
 import com.elyedali.makhzan.data.Money
 import com.elyedali.makhzan.data.OpType
@@ -151,6 +152,7 @@ object ReportPdf {
         customers: Map<Long, Customer>,
         daily: List<DaySales>,
         expenses: List<NamedTotal>,
+        bySeller: List<Pair<String, WorkerSales>> = emptyList(),
     ): File {
         val doc = PdfDocument()
         try {
@@ -176,6 +178,14 @@ object ReportPdf {
                     listOf(tr("المنتج"), tr("الكمية"), tr("المبلغ"), tr("الربح")),
                     listOf(0.46f, 0.14f, 0.20f, 0.20f),
                     top.map { listOf(it.name, it.qty.toString(), Money.format(it.amount, false), Money.format(it.profit, false)) },
+                )
+            }
+            if (bySeller.size > 1 || bySeller.any { it.second.workerId != null }) {
+                w.section(tr("المبيعات حسب البائع"))
+                w.table(
+                    listOf(tr("البائع"), tr("العدد"), tr("المبلغ")),
+                    listOf(0.50f, 0.20f, 0.30f),
+                    bySeller.map { (name, s) -> listOf(name, s.count.toString(), Money.format(s.amount, false)) },
                 )
             }
             if (daily.size > 1) {

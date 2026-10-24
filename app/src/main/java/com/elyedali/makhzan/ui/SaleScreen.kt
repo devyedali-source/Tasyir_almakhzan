@@ -61,7 +61,12 @@ import com.elyedali.makhzan.i18n.tr
 private data class SaleCartLine(val product: Product, val qty: Int)
 
 @Composable
-fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long) -> Unit) {
+fun SaleScreen(
+    dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long) -> Unit,
+    /** العامل البائع في وضع البائع (null = صاحب المحل) */
+    workerId: Long? = null,
+    allowCredit: Boolean = true,
+) {
     val cart = remember { mutableStateListOf<SaleCartLine>() }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -108,7 +113,7 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
         }
         scope.launch {
             try {
-                val opId = dao.recordSale(shopId, items, TrustedClock.now(), customerId)
+                val opId = dao.recordSale(shopId, items, TrustedClock.now(), customerId, workerId)
                 cart.clear()
                 busy = false
                 snackbar.currentSnackbarData?.dismiss()
@@ -146,12 +151,14 @@ fun SaleScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         // البيع بالدَّين: يُسجَّل على زبون ولا يدخل الصندوق حتى يُسدَّد
-                        OutlinedButton(
-                            enabled = cart.isNotEmpty() && !busy,
-                            modifier = Modifier.height(54.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            onClick = { showCreditPicker = true },
-                        ) { Text(tr("دَين")) }
+                        if (allowCredit) {
+                            OutlinedButton(
+                                enabled = cart.isNotEmpty() && !busy,
+                                modifier = Modifier.height(54.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                onClick = { showCreditPicker = true },
+                            ) { Text(tr("دَين")) }
+                        }
                         Button(
                             enabled = cart.isNotEmpty() && !busy,
                             modifier = Modifier.height(54.dp),

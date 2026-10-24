@@ -64,6 +64,8 @@ import com.elyedali.makhzan.ui.CustomerDetailScreen
 import com.elyedali.makhzan.ui.CustomersScreen
 import com.elyedali.makhzan.ui.PdfViewScreen
 import com.elyedali.makhzan.ui.ReportsScreen
+import com.elyedali.makhzan.ui.WorkerRoot
+import com.elyedali.makhzan.ui.WorkersScreen
 import com.elyedali.makhzan.ui.InvoiceScreen
 import com.elyedali.makhzan.ui.LoginScreen
 import com.elyedali.makhzan.ui.ProductDetailScreen
@@ -91,6 +93,7 @@ sealed interface Route {
     data class AdminActivate(val req: ActivationRequest) : Route
     data object AdminPanel : Route
     data class Customers(val shopId: Long) : Route
+    data class Workers(val shopId: Long) : Route
     data class Reports(val shopId: Long) : Route
     data class PdfView(val shopId: Long, val path: String, val title: String) : Route
     data class CustomerDetail(val shopId: Long, val customerId: Long) : Route
@@ -105,6 +108,7 @@ private fun Route.shopId(): Long? = when (this) {
     is Route.Settings -> shopId
     is Route.Invoice -> shopId
     is Route.Customers -> shopId
+    is Route.Workers -> shopId
     is Route.Reports -> shopId
     is Route.PdfView -> shopId
     is Route.CustomerDetail -> shopId
@@ -367,6 +371,19 @@ private fun AppRoot(
         }
     }
 
+    // وضع البائع: التطبيق مقفل على محل واحد حتى يُدخل صاحب المحل رمزه
+    var workerShop by remember { mutableStateOf(Prefs.workerModeShop(ctx)) }
+    val ws = workerShop
+    if (ws != null) {
+        LaunchedEffect(ws) { Money.currency = dao.profileNow(ws)?.currency ?: "" }
+        WorkerRoot(dao, ws, onExit = {
+            Prefs.setWorkerModeShop(ctx, null)
+            workerShop = null
+            stack = listOf(Route.Shops, Route.Home(ws))
+        })
+        return
+    }
+
     // عملة المحل المفتوح
     val currentShop = stack.lastOrNull { it.shopId() != null }?.shopId()
     LaunchedEffect(currentShop) {
@@ -389,6 +406,7 @@ private fun AppRoot(
         is Route.Invoice -> InvoiceScreen(dao, r.shopId, r.opId, onBack = ::back)
         is Route.AdminActivate -> AdminActivateScreen(r.req, onBack = ::back)
         Route.AdminPanel -> AdminPanelScreen(onBack = ::back, onActivate = { go(Route.AdminActivate(it)) })
+        is Route.Workers -> WorkersScreen(dao, r.shopId, onBack = ::back, onEnterWorkerMode = { stack = listOf(Route.Shops); workerShop = r.shopId })
         is Route.Reports -> ReportsScreen(dao, r.shopId, onBack = ::back, onPdf = { path, title -> go(Route.PdfView(r.shopId, path, title)) })
         is Route.PdfView -> PdfViewScreen(r.path, r.title, onBack = ::back)
         is Route.Customers -> CustomersScreen(dao, r.shopId, onBack = ::back, onOpen = { go(Route.CustomerDetail(r.shopId, it)) })

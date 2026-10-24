@@ -61,7 +61,7 @@ object OpType {
  * البيع بالدَّين (customerId غير فارغ) يُنقص المخزون ويُحسب في المبيعات والربح،
  * لكنه لا يدخل الصندوق حتى يسدده الزبون.
  */
-@Entity(tableName = "operations", indices = [Index("shopId"), Index("time"), Index("customerId")])
+@Entity(tableName = "operations", indices = [Index("shopId"), Index("time"), Index("customerId"), Index("workerId")])
 data class Operation(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val shopId: Long,
@@ -71,6 +71,8 @@ data class Operation(
     val time: Long,
     /** الزبون في البيع بالدَّين وفي التسديد (أُضيف في الإصدار 4) */
     val customerId: Long? = null,
+    /** العامل الذي سجّل العملية؛ null = صاحب المحل (أُضيف في الإصدار 5) */
+    val workerId: Long? = null,
 )
 
 // خارج الكيان حتى لا تعتبرها قاعدة البيانات أعمدة
@@ -93,6 +95,21 @@ data class Customer(
     val phone: String,
     val createdAt: Long,
 )
+
+/** عامل (بائع) في المحل: يبيع برمزه الخاص ولا يرى أرقام صاحب المحل (الإصدار 5) */
+@Entity(tableName = "workers", indices = [Index("shopId")])
+data class Worker(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val shopId: Long,
+    val name: String,
+    /** الرمز السري مشفّرًا (لا يُحفظ الرمز نفسه أبدًا) */
+    val pinHash: String,
+    /** هل يُسمح له بالبيع بالدَّين */
+    val canCredit: Boolean,
+    val createdAt: Long,
+)
+
+data class WorkerSales(val workerId: Long?, val count: Long, val amount: Long)
 
 data class ProductSales(
     val name: String,

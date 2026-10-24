@@ -12,8 +12,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * أي تغيير مستقبلي في الجداول يكون بترحيل (Migration) يحفظ بيانات التاجر.
  */
 @Database(
-    entities = [Shop::class, Product::class, Operation::class, OperationLine::class, ShopProfile::class, Customer::class],
-    version = 4,
+    entities = [Shop::class, Product::class, Operation::class, OperationLine::class, ShopProfile::class, Customer::class, Worker::class],
+    version = 5,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -53,6 +53,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** الإصدار 5: العمال (وضع البائع) ونسبة كل عملية إلى من سجّلها */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `workers` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`shopId` INTEGER NOT NULL, `name` TEXT NOT NULL, `pinHash` TEXT NOT NULL, " +
+                        "`canCredit` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_workers_shopId` ON `workers` (`shopId`)")
+                db.execSQL("ALTER TABLE `operations` ADD COLUMN `workerId` INTEGER")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_operations_workerId` ON `operations` (`workerId`)")
+            }
+        }
+
         const val FILE_NAME = "makhzan.db"
 
         @Volatile private var instance: AppDatabase? = null
@@ -60,7 +74,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(
                 context.applicationContext, AppDatabase::class.java, FILE_NAME
-            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
         }
 
         /** يغلق القاعدة قبل استبدال ملفها عند الاسترجاع من Drive */

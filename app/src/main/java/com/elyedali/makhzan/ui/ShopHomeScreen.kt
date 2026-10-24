@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.MoneyOff
 import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -197,6 +198,9 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
                 SmallAction(tr("الإعدادات"), Icons.Default.Settings, Color(0xFF455A64), Modifier.weight(1f)) {
                     go(Route.Settings(shopId))
                 }
+            }
+            SmallAction(tr("العمال ووضع البائع"), Icons.Default.Badge, Color(0xFF6D4C41), Modifier.fillMaxWidth()) {
+                go(Route.Workers(shopId))
             }
         }
     }

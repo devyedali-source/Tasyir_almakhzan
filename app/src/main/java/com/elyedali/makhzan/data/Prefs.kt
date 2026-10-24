@@ -24,6 +24,20 @@ object Prefs {
     fun registered(c: Context, uid: String) = sp(c).getBoolean("registered_$uid", false)
     fun setRegistered(c: Context, uid: String) = sp(c).edit().putBoolean("registered_$uid", true).commit()
 
+    // ---------- وضع البائع ----------
+    /** رمز صاحب المحل مشفّرًا (يحمي الخروج من وضع البائع) */
+    fun ownerPinHash(c: Context): String? = sp(c).getString("owner_pin_hash", null)
+    fun setOwnerPinHash(c: Context, v: String?) = sp(c).edit().putString("owner_pin_hash", v).commit()
+
+    /** المحل المسلَّم للعمال على هذا الهاتف (null = وضع صاحب المحل) */
+    fun workerModeShop(c: Context): Long? = sp(c).getLong("worker_mode_shop", -1L).takeIf { it > 0 }
+    fun setWorkerModeShop(c: Context, shopId: Long?) =
+        sp(c).edit().putLong("worker_mode_shop", shopId ?: -1L).commit()
+
+    /** بداية الوردية الحالية لكل عامل (لحساب ما سيسلّمه) */
+    fun shiftStart(c: Context, workerId: Long): Long = sp(c).getLong("shift_start_$workerId", 0L)
+    fun setShiftStart(c: Context, workerId: Long, t: Long) = sp(c).edit().putLong("shift_start_$workerId", t).commit()
+
     fun language(c: Context): String? = sp(c).getString("ui_language", null)
     fun setLanguage(c: Context, v: String) = sp(c).edit().putString("ui_language", v).commit()
 
