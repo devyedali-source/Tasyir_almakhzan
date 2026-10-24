@@ -104,11 +104,11 @@ fun InvoiceScreen(dao: ShopDao, shopId: Long, opId: Long?, onBack: () -> Unit) {
                         Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Button(onClick = { share(context, f) }, modifier = Modifier.weight(1f)) {
+                        Button(onClick = { sharePdf(context, f) }, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Share, contentDescription = null)
                             Text(tr("  مشاركة"))
                         }
-                        OutlinedButton(onClick = { print(context, f) }, modifier = Modifier.weight(1f)) {
+                        OutlinedButton(onClick = { printPdf(context, f) }, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Print, contentDescription = null)
                             Text(tr("  طباعة"))
                         }
@@ -153,7 +153,7 @@ private fun sampleInvoice() = InvoiceData(
     ),
 )
 
-private fun renderPages(file: File): List<Bitmap> {
+internal fun renderPages(file: File): List<Bitmap> {
     val result = mutableListOf<Bitmap>()
     ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
         PdfRenderer(pfd).use { renderer ->
@@ -171,17 +171,17 @@ private fun renderPages(file: File): List<Bitmap> {
     return result
 }
 
-private fun share(context: Context, file: File) {
+internal fun sharePdf(context: Context, file: File) {
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "application/pdf"
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    context.startActivity(Intent.createChooser(intent, tr("مشاركة الفاتورة")))
+    context.startActivity(Intent.createChooser(intent, tr("مشاركة")))
 }
 
-private fun print(context: Context, file: File) {
+internal fun printPdf(context: Context, file: File) {
     val manager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
     val adapter = object : PrintDocumentAdapter() {
         override fun onLayout(
@@ -210,4 +210,65 @@ private fun print(context: Context, file: File) {
         }
     }
     manager.print(file.nameWithoutExtension, adapter, null)
+}
+
+
+/** عرض أي ملف PDF (التقارير) مع المشاركة والطباعة */
+@Composable
+fun PdfViewScreen(path: String, title: String, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val file = remember(path) { File(path) }
+    var pages by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(path) {
+        try {
+            pages = withContext(Dispatchers.IO) { renderPages(file) }
+        } catch (e: Exception) {
+            error = e.message ?: ""
+        }
+    }
+    Scaffold(
+        topBar = { AppTopBar(title, onBack) },
+        bottomBar = {
+            Surface(tonalElevation = 6.dp, shadowElevation = 6.dp) {
+                Row(
+                    Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Button(onClick = { sharePdf(context, file) }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Share, contentDescription = null)
+                        Text("  " + tr("مشاركة"))
+                    }
+                    OutlinedButton(onClick = { printPdf(context, file) }, modifier = Modifier.weight(1f)) {
+                        Icon(Icons.Default.Print, contentDescription = null)
+                        Text("  " + tr("طباعة"))
+                    }
+                }
+            }
+        },
+    ) { pad ->
+        Box(
+            Modifier.padding(pad).fillMaxSize().background(Color(0xFFE0E0E0)),
+            contentAlignment = Alignment.Center,
+        ) {
+            when {
+                error != null -> Text(error!!)
+                pages.isEmpty() -> CircularProgressIndicator()
+                else -> LazyColumn(
+                    Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    items(pages) { bmp ->
+                        Image(
+                            bitmap = bmp.asImageBitmap(), contentDescription = null,
+                            contentScale = ContentScale.FillWidth,
+                            modifier = Modifier.fillMaxWidth().background(Color.White),
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

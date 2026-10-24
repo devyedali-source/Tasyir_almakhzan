@@ -94,6 +94,13 @@ data class Customer(
     val createdAt: Long,
 )
 
+data class ProductSales(
+    val name: String,
+    val qty: Long,
+    val amount: Long,
+    val profit: Long,
+)
+
 data class CustomerDebt(
     @Embedded val customer: Customer,
     val debt: Long,

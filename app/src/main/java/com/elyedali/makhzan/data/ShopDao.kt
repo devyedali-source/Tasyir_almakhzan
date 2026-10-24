@@ -120,6 +120,48 @@ abstract class ShopDao {
     )
     abstract fun balance(shopId: Long): Flow<Long>
 
+    // ---------- التقارير بين تاريخين (from مشمول، to غير مشمول) ----------
+    @Query("SELECT COALESCE(SUM(total), 0) FROM operations WHERE shopId = :shopId AND type = :type AND time >= :from AND time < :to")
+    abstract suspend fun sumTypeRange(shopId: Long, type: String, from: Long, to: Long): Long
+
+    @Query("SELECT COALESCE(SUM(total), 0) FROM operations WHERE shopId = :shopId AND type = 'SALE' AND customerId IS NOT NULL AND time >= :from AND time < :to")
+    abstract suspend fun creditSalesRange(shopId: Long, from: Long, to: Long): Long
+
+    @Query(
+        "SELECT COALESCE(SUM((l.unitPrice - l.unitCost) * l.qty), 0) FROM operation_lines l " +
+            "JOIN operations o ON o.id = l.opId " +
+            "WHERE o.shopId = :shopId AND o.type = 'SALE' AND o.time >= :from AND o.time < :to"
+    )
+    abstract suspend fun profitRange(shopId: Long, from: Long, to: Long): Long
+
+    /** رصيد الصندوق قبل لحظة معينة (لحساب رصيد بداية الفترة ونهايتها) */
+    @Query(
+        "SELECT COALESCE(SUM(CASE " +
+            "WHEN type = 'SALE' AND customerId IS NOT NULL THEN 0 " +
+            "WHEN type IN ('SALE', 'PAYMENT') THEN total " +
+            "ELSE -total END), 0) " +
+            "FROM operations WHERE shopId = :shopId AND time < :before"
+    )
+    abstract suspend fun balanceBefore(shopId: Long, before: Long): Long
+
+    @Query(
+        "SELECT l.productName AS name, SUM(l.qty) AS qty, SUM(l.qty * l.unitPrice) AS amount, " +
+            "SUM((l.unitPrice - l.unitCost) * l.qty) AS profit FROM operation_lines l " +
+            "JOIN operations o ON o.id = l.opId " +
+            "WHERE o.shopId = :shopId AND o.type = 'SALE' AND o.time >= :from AND o.time < :to " +
+            "GROUP BY l.productId ORDER BY amount DESC"
+    )
+    abstract suspend fun productSalesRange(shopId: Long, from: Long, to: Long): List<ProductSales>
+
+    @Query("SELECT * FROM operations WHERE shopId = :shopId AND time >= :from AND time < :to ORDER BY time")
+    abstract suspend fun operationsRange(shopId: Long, from: Long, to: Long): List<Operation>
+
+    @Query("SELECT * FROM products WHERE shopId = :shopId ORDER BY name")
+    abstract suspend fun productsNow(shopId: Long): List<Product>
+
+    @Query("SELECT * FROM customers WHERE shopId = :shopId")
+    abstract suspend fun customersNow(shopId: Long): List<Customer>
+
     // ---------- الزبائن والديون ----------
     @Insert
     abstract suspend fun insertCustomer(customer: Customer): Long
