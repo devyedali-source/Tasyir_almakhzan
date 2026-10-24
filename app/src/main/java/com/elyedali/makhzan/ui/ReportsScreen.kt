@@ -14,6 +14,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -159,8 +161,10 @@ fun ReportsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPdf: (path: 
                         val top = dao.productSalesRange(shopId, from, toExclusive)
                         val ops = dao.operationsRange(shopId, from, toExclusive)
                         val customers = dao.customersNow(shopId).associateBy { it.id }
+                        val daily = dao.dailySalesRange(shopId, from, toExclusive)
+                        val exps = dao.expensesByNote(shopId, from, toExclusive)
                         val f = withContext(Dispatchers.IO) {
-                            ReportPdf.period(context, shop?.name ?: "", sum, top, ops, customers)
+                            ReportPdf.period(context, shop?.name ?: "", sum, top, ops, customers, daily, exps)
                         }
                         busy = false
                         onPdf(f.absolutePath, tr("تقرير الفترة"))
@@ -190,6 +194,40 @@ fun ReportsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPdf: (path: 
             ) {
                 Icon(Icons.Default.Inventory2, contentDescription = null)
                 Text("  " + tr("سحب تقرير المخزون والوضع الراهن"))
+            }
+            OutlinedButton(
+                enabled = !busy, modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                onClick = {
+                    busy = true
+                    scope.launch {
+                        val shop = dao.shopNow(shopId)
+                        val list = dao.customersWithDebt(shopId).first()
+                        val f = withContext(Dispatchers.IO) { ReportPdf.debts(context, shop?.name ?: "", list) }
+                        busy = false
+                        onPdf(f.absolutePath, tr("تقرير الديون"))
+                    }
+                },
+            ) {
+                Icon(Icons.Default.People, contentDescription = null)
+                Text("  " + tr("سحب تقرير الديون"))
+            }
+            OutlinedButton(
+                enabled = !busy, modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                onClick = {
+                    busy = true
+                    scope.launch {
+                        val shop = dao.shopNow(shopId)
+                        val list = dao.productsWithLastSale(shopId)
+                        val f = withContext(Dispatchers.IO) { ReportPdf.restock(context, shop?.name ?: "", list) }
+                        busy = false
+                        onPdf(f.absolutePath, tr("تقرير التموين والسلع الراكدة"))
+                    }
+                },
+            ) {
+                Icon(Icons.Default.Warning, contentDescription = null)
+                Text("  " + tr("سحب تقرير التموين والسلع الراكدة"))
             }
             if (busy) CircularProgressIndicator()
         }

@@ -101,6 +101,15 @@ data class ProductSales(
     val profit: Long,
 )
 
+data class DaySales(val day: String, val amount: Long, val profit: Long)
+
+data class NamedTotal(val name: String, val count: Long, val amount: Long)
+
+data class ProductLastSale(
+    @Embedded val product: Product,
+    val lastSale: Long?,
+)
+
 data class CustomerDebt(
     @Embedded val customer: Customer,
     val debt: Long,

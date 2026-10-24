@@ -58,6 +58,9 @@ import com.elyedali.makhzan.data.ShopDao
 import com.elyedali.makhzan.data.TrustedClock
 import com.elyedali.makhzan.i18n.tr
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.elyedali.makhzan.invoice.ReportPdf
 
 private val DebtColor = Color(0xFFB45309)
 private val PaidColor = Color(0xFF0B6E4F)
@@ -153,7 +156,10 @@ fun CustomersScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onOpen: (Lon
 
 /** صفحة الزبون: دينه، سجل مشترياته وتسديداته، التسديد والتذكير عبر واتساب */
 @Composable
-fun CustomerDetailScreen(dao: ShopDao, shopId: Long, customerId: Long, onBack: () -> Unit, onInvoice: (Long) -> Unit) {
+fun CustomerDetailScreen(
+    dao: ShopDao, shopId: Long, customerId: Long, onBack: () -> Unit, onInvoice: (Long) -> Unit,
+    onPdf: (path: String, title: String) -> Unit,
+) {
     val customer by dao.customer(customerId).collectAsState(initial = null)
     val debt by dao.customerDebt(customerId).collectAsState(initial = 0L)
     val ops by dao.customerOperations(customerId).collectAsState(initial = emptyList())
@@ -215,7 +221,20 @@ fun CustomerDetailScreen(dao: ShopDao, shopId: Long, customerId: Long, onBack: (
                 }
             }
             item {
-                TextButton(onClick = { showEdit = true }) { Text(tr("تعديل الاسم والهاتف")) }
+                Row {
+                    TextButton(onClick = {
+                        scope.launch {
+                            val c = dao.customerNow(customerId) ?: return@launch
+                            val shop = dao.shopNow(shopId)
+                            val list = dao.customerOperationsNow(customerId)
+                            val f = withContext(Dispatchers.IO) {
+                                ReportPdf.customerStatement(context, shop?.name ?: "", c, list)
+                            }
+                            onPdf(f.absolutePath, tr("كشف حساب: %1\$s", c.name))
+                        }
+                    }) { Text(tr("كشف حساب PDF")) }
+                    TextButton(onClick = { showEdit = true }) { Text(tr("تعديل الاسم والهاتف")) }
+                }
             }
             item { Text(tr("السجل"), style = MaterialTheme.typography.titleMedium) }
             if (ops.isEmpty()) item { Text(tr("لا توجد عمليات")) }

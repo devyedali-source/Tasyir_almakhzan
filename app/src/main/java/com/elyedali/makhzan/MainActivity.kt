@@ -394,6 +394,7 @@ private fun AppRoot(
         is Route.Customers -> CustomersScreen(dao, r.shopId, onBack = ::back, onOpen = { go(Route.CustomerDetail(r.shopId, it)) })
         is Route.CustomerDetail -> CustomerDetailScreen(
             dao, r.shopId, r.customerId, onBack = ::back, onInvoice = { go(Route.Invoice(r.shopId, it)) },
+            onPdf = { path, title -> go(Route.PdfView(r.shopId, path, title)) },
         )
     }
 }

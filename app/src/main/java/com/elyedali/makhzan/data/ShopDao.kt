@@ -159,6 +159,34 @@ abstract class ShopDao {
     @Query("SELECT * FROM products WHERE shopId = :shopId ORDER BY name")
     abstract suspend fun productsNow(shopId: Long): List<Product>
 
+    /** المبيعات والربح لكل يوم (بتوقيت الهاتف) */
+    @Query(
+        "SELECT strftime('%Y/%m/%d', o.time / 1000, 'unixepoch', 'localtime') AS day, " +
+            "SUM(l.qty * l.unitPrice) AS amount, SUM((l.unitPrice - l.unitCost) * l.qty) AS profit " +
+            "FROM operation_lines l JOIN operations o ON o.id = l.opId " +
+            "WHERE o.shopId = :shopId AND o.type = 'SALE' AND o.time >= :from AND o.time < :to " +
+            "GROUP BY day ORDER BY day"
+    )
+    abstract suspend fun dailySalesRange(shopId: Long, from: Long, to: Long): List<DaySales>
+
+    @Query(
+        "SELECT note AS name, COUNT(*) AS count, SUM(total) AS amount FROM operations " +
+            "WHERE shopId = :shopId AND type = 'EXPENSE' AND time >= :from AND time < :to " +
+            "GROUP BY note ORDER BY amount DESC"
+    )
+    abstract suspend fun expensesByNote(shopId: Long, from: Long, to: Long): List<NamedTotal>
+
+    /** آخر تاريخ بيع لكل منتج (لكشف السلع الراكدة) */
+    @Query(
+        "SELECT p.*, (SELECT MAX(o.time) FROM operation_lines l JOIN operations o ON o.id = l.opId " +
+            "WHERE l.productId = p.id AND o.type = 'SALE') AS lastSale " +
+            "FROM products p WHERE p.shopId = :shopId ORDER BY p.qty, p.name"
+    )
+    abstract suspend fun productsWithLastSale(shopId: Long): List<ProductLastSale>
+
+    @Query("SELECT * FROM operations WHERE customerId = :customerId ORDER BY time")
+    abstract suspend fun customerOperationsNow(customerId: Long): List<Operation>
+
     @Query("SELECT * FROM customers WHERE shopId = :shopId")
     abstract suspend fun customersNow(shopId: Long): List<Customer>
 

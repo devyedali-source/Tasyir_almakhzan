@@ -9,6 +9,10 @@ import android.graphics.pdf.PdfDocument
 import android.text.TextPaint
 import android.text.TextUtils
 import com.elyedali.makhzan.data.Customer
+import com.elyedali.makhzan.data.CustomerDebt
+import com.elyedali.makhzan.data.DaySales
+import com.elyedali.makhzan.data.NamedTotal
+import com.elyedali.makhzan.data.ProductLastSale
 import com.elyedali.makhzan.data.Dates
 import com.elyedali.makhzan.data.Money
 import com.elyedali.makhzan.data.OpType
@@ -145,6 +149,8 @@ object ReportPdf {
         top: List<ProductSales>,
         ops: List<Operation>,
         customers: Map<Long, Customer>,
+        daily: List<DaySales>,
+        expenses: List<NamedTotal>,
     ): File {
         val doc = PdfDocument()
         try {
@@ -172,6 +178,22 @@ object ReportPdf {
                     top.map { listOf(it.name, it.qty.toString(), Money.format(it.amount, false), Money.format(it.profit, false)) },
                 )
             }
+            if (daily.size > 1) {
+                w.section(tr("المبيعات اليومية"))
+                w.table(
+                    listOf(tr("اليوم"), tr("المبيعات"), tr("الربح")),
+                    listOf(0.40f, 0.30f, 0.30f),
+                    daily.map { listOf(it.day, Money.format(it.amount, false), Money.format(it.profit, false)) },
+                )
+            }
+            if (expenses.isNotEmpty()) {
+                w.section(tr("المصاريف حسب البيان"))
+                w.table(
+                    listOf(tr("البيان"), tr("العدد"), tr("المبلغ")),
+                    listOf(0.50f, 0.20f, 0.30f),
+                    expenses.map { listOf(it.name, it.count.toString(), Money.format(it.amount, false)) },
+                )
+            }
             w.section(tr("العمليات"))
             if (ops.isEmpty()) w.row(tr("لا توجد عمليات في هذه الفترة"), "")
             else w.table(
@@ -191,6 +213,110 @@ object ReportPdf {
             doc.close()
         }
     }
+
+    /** تقرير الديون: كل الزبائن الذين عليهم مبالغ، الأكبر أولًا */
+    fun debts(context: Context, shopName: String, list: List<CustomerDebt>): File {
+        val doc = PdfDocument()
+        try {
+            val w = Writer(doc, shopName, tr("تقرير الديون"), Dates.format(TrustedClock.now()))
+            w.newPage()
+            val owing = list.filter { it.debt > 0 }
+            w.section(tr("الملخص"))
+            w.row(tr("مجموع الديون على الزبائن"), Money.format(owing.sumOf { it.debt }), bold = true)
+            w.row(tr("عدد الزبائن المدينين"), owing.size.toString())
+            w.section(tr("الزبائن"))
+            if (owing.isEmpty()) w.row(tr("لا دَين"), "")
+            else w.table(
+                listOf(tr("اسم الزبون"), tr("الهاتف"), tr("الدَّين المتبقي")),
+                listOf(0.44f, 0.26f, 0.30f),
+                owing.map { listOf(it.customer.name, it.customer.phone, Money.format(it.debt, false)) },
+            )
+            val f = out(context, "report_debts.pdf")
+            w.finish(f)
+            return f
+        } finally {
+            doc.close()
+        }
+    }
+
+    /** كشف حساب زبون: كل مشترياته بالدَّين وتسديداته مع الرصيد بعد كل عملية */
+    fun customerStatement(context: Context, shopName: String, customer: Customer, ops: List<Operation>): File {
+        val doc = PdfDocument()
+        try {
+            val w = Writer(doc, shopName, tr("كشف حساب: %1\$s", customer.name), Dates.format(TrustedClock.now()))
+            w.newPage()
+            var balance = 0L
+            val rows = ops.map { op ->
+                val isPayment = op.type == OpType.PAYMENT
+                balance += if (isPayment) -op.total else op.total
+                listOf(
+                    Dates.format(op.time),
+                    if (isPayment) tr("تسديد") else tr("شراء بالدَّين"),
+                    (if (isPayment) "−" else "+") + Money.format(op.total, false),
+                    Money.format(balance, false),
+                )
+            }
+            w.section(tr("الملخص"))
+            if (customer.phone.isNotBlank()) w.row(tr("الهاتف"), customer.phone)
+            w.row(tr("الدَّين المتبقي"), Money.format(balance), bold = true)
+            w.section(tr("السجل"))
+            if (rows.isEmpty()) w.row(tr("لا توجد عمليات"), "")
+            else w.table(
+                listOf(tr("التاريخ"), tr("العملية"), tr("المبلغ"), tr("الرصيد")),
+                listOf(0.30f, 0.28f, 0.21f, 0.21f),
+                rows,
+            )
+            val f = out(context, "statement_${customer.id}.pdf")
+            w.finish(f)
+            return f
+        } finally {
+            doc.close()
+        }
+    }
+
+    /** منتجات تحتاج إعادة تموين (5 قطع أو أقل) وسلع راكدة لم تُبع منذ 30 يومًا */
+    fun restock(context: Context, shopName: String, list: List<ProductLastSale>): File {
+        val doc = PdfDocument()
+        try {
+            val now = TrustedClock.now()
+            val w = Writer(doc, shopName, tr("تقرير التموين والسلع الراكدة"), Dates.format(now))
+            w.newPage()
+            val low = list.filter { it.product.qty <= RESTOCK_LEVEL }
+            val slowLimit = now - 30L * 86_400_000L
+            val slow = list.filter { it.product.qty > 0 && (it.lastSale ?: 0L) < slowLimit && it.product.createdAt < slowLimit }
+            w.section(tr("منتجات تحتاج إعادة تموين (%1\$s قطع أو أقل)", RESTOCK_LEVEL))
+            if (low.isEmpty()) w.row(tr("لا شيء"), "")
+            else w.table(
+                listOf(tr("المنتج"), tr("الكمية"), tr("متوسط الشراء"), tr("آخر بيع")),
+                listOf(0.42f, 0.14f, 0.20f, 0.24f),
+                low.map {
+                    listOf(it.product.name, it.product.qty.toString(), Money.format(it.product.buyPrice, false),
+                        it.lastSale?.let { t -> Dates.formatDay(t) } ?: "—")
+                },
+            )
+            w.section(tr("سلع راكدة: لم تُبع منذ 30 يومًا"))
+            if (slow.isEmpty()) w.row(tr("لا شيء"), "")
+            else w.table(
+                listOf(tr("المنتج"), tr("الكمية"), tr("القيمة"), tr("آخر بيع")),
+                listOf(0.42f, 0.14f, 0.20f, 0.24f),
+                slow.map {
+                    listOf(it.product.name, it.product.qty.toString(),
+                        Money.format(it.product.qty.toLong() * it.product.buyPrice, false),
+                        it.lastSale?.let { t -> Dates.formatDay(t) } ?: tr("لم يُبع"))
+                },
+            )
+            if (slow.isNotEmpty()) {
+                w.row(tr("مال مجمّد في السلع الراكدة"), Money.format(slow.sumOf { it.product.qty.toLong() * it.product.buyPrice }), bold = true)
+            }
+            val f = out(context, "report_restock.pdf")
+            w.finish(f)
+            return f
+        } finally {
+            doc.close()
+        }
+    }
+
+    const val RESTOCK_LEVEL = 5
 
     fun stock(
         context: Context,
