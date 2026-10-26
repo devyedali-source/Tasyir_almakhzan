@@ -454,11 +454,18 @@ abstract class ShopDao {
      * نقدًا يخرج المبلغ من الصندوق؛ وبالدَّين (supplierId) يُسجَّل على المحل للمورد.
      */
     @Transaction
-    open suspend fun recordPurchase(shopId: Long, items: List<PurchaseItem>, time: Long, supplierId: Long? = null): Long {
+    open suspend fun recordPurchase(
+        shopId: Long, items: List<PurchaseItem>, time: Long, supplierId: Long? = null,
+        /** مخزون افتتاحي: بضاعة موجودة عند التاجر قبل استعمال التطبيق، لا تخرج من الصندوق */
+        opening: Boolean = false,
+    ): Long {
         require(items.isNotEmpty())
         val total = items.sumOf { Qty.amount(it.buyPrice, it.qty) }
         val opId = insertOperation(
-            Operation(shopId = shopId, type = OpType.PURCHASE, total = total, note = "", time = time, supplierId = supplierId)
+            Operation(
+                shopId = shopId, type = if (opening) OpType.OPENING else OpType.PURCHASE, total = total, note = "", time = time,
+                supplierId = if (opening) null else supplierId,
+            )
         )
         for (item in items) {
             require(item.qty > 0)
@@ -637,7 +644,7 @@ abstract class ShopDao {
                     addQty(p.id, l.qty)
                 }
             }
-            OpType.PURCHASE -> {
+            OpType.PURCHASE, OpType.OPENING -> {
                 // التحقق أولًا لكل السطور ثم التنفيذ (المعاملة تلغي كل شيء عند أي خطأ)
                 for (l in opLines) {
                     takeBack(l, tr("لا يمكن إلغاء هذا الشراء: بيع جزء من «%1\$s» بعده", l.productName))

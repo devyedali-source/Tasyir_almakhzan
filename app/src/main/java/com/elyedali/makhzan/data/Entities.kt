@@ -55,6 +55,8 @@ object OpType {
     const val ADJUST = "ADJUST"
     /** دفع المحل لمورد جزءًا من دينه أو كله (يخرج من الصندوق) */
     const val SUPPLIER_PAYMENT = "SUPPLIER_PAYMENT"
+    /** المخزون الموجود عند بدء استعمال التطبيق: يدخل المخزون بتكلفته دون أن يمسّ الصندوق */
+    const val OPENING = "OPENING"
 
     fun label(type: String) = when (type) {
         SALE -> tr("بيع")
@@ -64,6 +66,7 @@ object OpType {
         RETURN -> tr("مرتجع")
         ADJUST -> tr("تسوية مخزون")
         SUPPLIER_PAYMENT -> tr("دفع لمورد")
+        OPENING -> tr("مخزون افتتاحي")
         else -> type
     }
 }
@@ -74,7 +77,7 @@ const val CASH_CASE =
         "WHEN type = 'SALE' AND customerId IS NOT NULL THEN 0 " +
         "WHEN type = 'RETURN' AND customerId IS NOT NULL THEN 0 " +
         "WHEN type = 'PURCHASE' AND supplierId IS NOT NULL THEN 0 " +
-        "WHEN type = 'ADJUST' THEN 0 " +
+        "WHEN type IN ('ADJUST', 'OPENING') THEN 0 " +
         "WHEN type IN ('SALE', 'PAYMENT') THEN total " +
         "ELSE -total END"
 
@@ -115,7 +118,7 @@ val Operation.isCreditPurchase: Boolean get() = type == OpType.PURCHASE && suppl
 /** أثر العملية على الصندوق */
 val Operation.cashEffect: Long
     get() = when {
-        isCredit || isCreditPurchase || type == OpType.ADJUST -> 0L
+        isCredit || isCreditPurchase || type == OpType.ADJUST || type == OpType.OPENING -> 0L
         type == OpType.RETURN && customerId != null -> 0L
         type == OpType.SALE || type == OpType.PAYMENT -> total
         else -> -total

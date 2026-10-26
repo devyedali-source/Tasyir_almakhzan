@@ -60,7 +60,10 @@ import kotlinx.coroutines.launch
 import com.elyedali.makhzan.i18n.tr
 
 @Composable
-fun StockScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onOpen: (Long) -> Unit, onStocktake: () -> Unit) {
+fun StockScreen(
+    dao: ShopDao, shopId: Long, onBack: () -> Unit, onOpen: (Long) -> Unit, onStocktake: () -> Unit,
+    onOpeningStock: () -> Unit,
+) {
     val products by dao.products(shopId).collectAsState(initial = emptyList())
     val value by dao.stockValue(shopId).collectAsState(initial = 0L)
     var query by remember { mutableStateOf("") }
@@ -105,6 +108,12 @@ fun StockScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onOpen: (Long) -
                 }
             }
             item {
+                // البضاعة التي كانت عند التاجر قبل التطبيق: تدخل المخزون دون أن تخرج من الصندوق
+                OutlinedButton(onClick = onOpeningStock, modifier = Modifier.fillMaxWidth()) {
+                    Text(tr("إدخال المخزون الموجود عندي (دون شراء)"))
+                }
+            }
+            item {
                 OutlinedTextField(
                     value = query, onValueChange = { query = it },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
@@ -113,7 +122,7 @@ fun StockScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onOpen: (Long) -
                 )
             }
             if (products.isEmpty()) {
-                item { Text(tr("لا توجد منتجات بعد. أدخل البضاعة من شاشة الشراء.")) }
+                item { Text(tr("لا توجد منتجات بعد. أدخل البضاعة الموجودة عندك من الزر أعلاه، والمشتريات الجديدة من شاشة الشراء.")) }
             }
             items(shown, key = { it.id }) { p ->
                 Card(onClick = { onOpen(p.id) }, modifier = Modifier.fillMaxWidth()) {
@@ -188,7 +197,7 @@ fun ProductDetailScreen(dao: ShopDao, productId: Long, onBack: () -> Unit) {
             if (moves.isEmpty()) item { Text(tr("لا توجد حركات")) }
             items(moves, key = { it.line.id }) { m ->
                 val q = when (m.type) {
-                    OpType.PURCHASE, OpType.RETURN -> m.line.qty
+                    OpType.PURCHASE, OpType.RETURN, OpType.OPENING -> m.line.qty
                     OpType.ADJUST -> m.line.qty
                     else -> -m.line.qty
                 }
@@ -199,6 +208,7 @@ fun ProductDetailScreen(dao: ShopDao, productId: Long, onBack: () -> Unit) {
                             Text(
                                 when (m.type) {
                                     OpType.PURCHASE -> tr("دخول (شراء)")
+                                    OpType.OPENING -> tr("دخول (مخزون افتتاحي)")
                                     OpType.RETURN -> tr("دخول (مرتجع)")
                                     OpType.ADJUST -> if (isIn) tr("زيادة (تسوية)") else tr("نقص (تسوية)")
                                     else -> tr("خروج (بيع)")

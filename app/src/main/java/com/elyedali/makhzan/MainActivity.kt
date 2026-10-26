@@ -101,6 +101,7 @@ sealed interface Route {
     data class PdfView(val shopId: Long, val path: String, val title: String) : Route
     data class CustomerDetail(val shopId: Long, val customerId: Long) : Route
     data class Stocktake(val shopId: Long) : Route
+    data class OpeningStock(val shopId: Long) : Route
     data class Suppliers(val shopId: Long) : Route
     data class SupplierDetail(val shopId: Long, val supplierId: Long) : Route
 }
@@ -119,6 +120,7 @@ private fun Route.shopId(): Long? = when (this) {
     is Route.PdfView -> shopId
     is Route.CustomerDetail -> shopId
     is Route.Stocktake -> shopId
+    is Route.OpeningStock -> shopId
     is Route.Suppliers -> shopId
     is Route.SupplierDetail -> shopId
     else -> null
@@ -412,7 +414,9 @@ private fun AppRoot(
         is Route.Stock -> StockScreen(
             dao, r.shopId, onBack = ::back, onOpen = { go(Route.ProductDetail(it)) },
             onStocktake = { go(Route.Stocktake(r.shopId)) },
+            onOpeningStock = { go(Route.OpeningStock(r.shopId)) },
         )
+        is Route.OpeningStock -> PurchaseScreen(dao, r.shopId, onBack = ::back, opening = true)
         is Route.Stocktake -> StocktakeScreen(dao, r.shopId, onBack = ::back)
         is Route.Suppliers -> SuppliersScreen(dao, r.shopId, onBack = ::back, onOpen = { go(Route.SupplierDetail(r.shopId, it)) })
         is Route.SupplierDetail -> SupplierDetailScreen(dao, r.shopId, r.supplierId, onBack = ::back)

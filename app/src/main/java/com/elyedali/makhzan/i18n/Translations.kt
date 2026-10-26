@@ -3,6 +3,17 @@ package com.elyedali.makhzan.i18n
 /** قواميس الترجمة: المفتاح هو النص العربي كما هو في الواجهة */
 internal object Translations {
     val fr: Map<String, String> = hashMapOf(
+        "أُضيف المخزون: %1\$s منتج بقيمة %2\$s" to "Stock ajouté : %1\$s produit(s) d'une valeur de %2\$s",
+        "إدخال المخزون الموجود" to "Saisir le stock existant",
+        "إدخال المخزون الموجود عندي (دون شراء)" to "Saisir mon stock existant (sans achat)",
+        "ابدأ بإدخال مخزونك الحالي، ولن يخرج أي مبلغ من الصندوق." to "Commencez par saisir votre stock actuel ; aucun montant ne sortira de la caisse.",
+        "حفظ المخزون" to "Enregistrer le stock",
+        "دخول (مخزون افتتاحي)" to "Entrée (stock initial)",
+        "سجّل هنا البضاعة الموجودة عندك الآن: امسح كود كل منتج واكتب كميته وسعر شرائه وسعر بيعه.\nلا يخرج أي مبلغ من الصندوق." to "Enregistrez ici la marchandise que vous avez déjà : scannez chaque produit et saisissez sa quantité, son prix d'achat et son prix de vente.\nAucun montant ne sort de la caisse.",
+        "عندك بضاعة في المحل الآن؟" to "Vous avez déjà de la marchandise ?",
+        "قيمة المخزون بسعر الشراء" to "Valeur du stock au prix d'achat",
+        "لا توجد منتجات بعد. أدخل البضاعة الموجودة عندك من الزر أعلاه، والمشتريات الجديدة من شاشة الشراء." to "Aucun produit. Saisissez votre stock existant avec le bouton ci-dessus, et les nouveaux achats depuis l'écran Achat.",
+        "مخزون افتتاحي" to "Stock initial",
         "إفراغ السلة؟" to "Vider le panier ?",
         "تنبيه: هذا المحل مفعّل، وسيضيع ما بقي من مدة تفعيله." to "Attention : cette boutique est activée, la durée d'activation restante sera perdue.",
         "حذف المحل «%1\$s»" to "Supprimer la boutique « %1\$s »",
@@ -574,6 +585,17 @@ internal object Translations {
     )
 
     val en: Map<String, String> = hashMapOf(
+        "أُضيف المخزون: %1\$s منتج بقيمة %2\$s" to "Stock added: %1\$s product(s) worth %2\$s",
+        "إدخال المخزون الموجود" to "Enter existing stock",
+        "إدخال المخزون الموجود عندي (دون شراء)" to "Enter my existing stock (no purchase)",
+        "ابدأ بإدخال مخزونك الحالي، ولن يخرج أي مبلغ من الصندوق." to "Start by entering your current stock; no money will leave the cash box.",
+        "حفظ المخزون" to "Save stock",
+        "دخول (مخزون افتتاحي)" to "In (opening stock)",
+        "سجّل هنا البضاعة الموجودة عندك الآن: امسح كود كل منتج واكتب كميته وسعر شرائه وسعر بيعه.\nلا يخرج أي مبلغ من الصندوق." to "Record here the goods you already have: scan each product and enter its quantity, purchase price and selling price.\nNo money leaves the cash box.",
+        "عندك بضاعة في المحل الآن؟" to "Already have goods in the shop?",
+        "قيمة المخزون بسعر الشراء" to "Stock value at purchase price",
+        "لا توجد منتجات بعد. أدخل البضاعة الموجودة عندك من الزر أعلاه، والمشتريات الجديدة من شاشة الشراء." to "No products yet. Enter your existing stock with the button above, and new purchases from the Purchase screen.",
+        "مخزون افتتاحي" to "Opening stock",
         "إفراغ السلة؟" to "Empty the cart?",
         "تنبيه: هذا المحل مفعّل، وسيضيع ما بقي من مدة تفعيله." to "Warning: this shop is activated; the remaining activation time will be lost.",
         "حذف المحل «%1\$s»" to "Delete the shop “%1\$s”",

@@ -62,7 +62,11 @@ private data class PendingScan(
 )
 
 @Composable
-fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
+fun PurchaseScreen(
+    dao: ShopDao, shopId: Long, onBack: () -> Unit,
+    /** إدخال المخزون الموجود عند التاجر (لا يخرج من الصندوق ولا يُسجَّل على مورد) */
+    opening: Boolean = false,
+) {
     val cart = remember { mutableStateListOf<PurchaseItem>() }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -125,11 +129,14 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
         val sum = total
         scope.launch {
             try {
-                dao.recordPurchase(shopId, items, TrustedClock.now(), supplierId)
+                dao.recordPurchase(shopId, items, TrustedClock.now(), supplierId, opening)
                 cart.clear()
                 toast(
-                    if (supplierId == null) tr("تم تسجيل الشراء: %1\$s", Money.format(sum))
-                    else tr("تم تسجيل الشراء بالدَّين: %1\$s", Money.format(sum))
+                    when {
+                        opening -> tr("أُضيف المخزون: %1\$s منتج بقيمة %2\$s", items.size, Money.format(sum))
+                        supplierId == null -> tr("تم تسجيل الشراء: %1\$s", Money.format(sum))
+                        else -> tr("تم تسجيل الشراء بالدَّين: %1\$s", Money.format(sum))
+                    }
                 )
             } catch (e: Exception) {
                 toast(tr("تعذر تسجيل الشراء: %1\$s", e.message ?: ""))
@@ -140,7 +147,7 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
     }
 
     Scaffold(
-        topBar = { AppTopBar(tr("شراء"), ::tryBack) },
+        topBar = { AppTopBar(if (opening) tr("إدخال المخزون الموجود") else tr("شراء"), ::tryBack) },
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             Surface(tonalElevation = 6.dp, shadowElevation = 6.dp) {
@@ -150,7 +157,7 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Column {
-                        Text(tr("مجموع الشراء"), style = MaterialTheme.typography.bodySmall)
+                        Text(if (opening) tr("قيمة المخزون بسعر الشراء") else tr("مجموع الشراء"), style = MaterialTheme.typography.bodySmall)
                         Text(
                             Money.format(total), style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
@@ -158,7 +165,7 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     // الشراء بالدَّين من مورد: لا يخرج من الصندوق حتى يُدفع له
-                    OutlinedButton(
+                    if (!opening) OutlinedButton(
                         enabled = cart.isNotEmpty() && !busy,
                         modifier = Modifier.height(54.dp),
                         shape = RoundedCornerShape(16.dp),
@@ -169,7 +176,7 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                         modifier = Modifier.height(54.dp),
                         shape = RoundedCornerShape(16.dp),
                         onClick = { confirmPurchase(null) },
-                    ) { Text(tr("تأكيد الشراء"), style = MaterialTheme.typography.titleMedium) }
+                    ) { Text(if (opening) tr("حفظ المخزون") else tr("تأكيد الشراء"), style = MaterialTheme.typography.titleMedium) }
                     }
                 }
             }
@@ -196,7 +203,8 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
             if (cart.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        tr("امسح الكود بار للمنتج.\nإذا كان جديدًا سيُطلب منك اسمه وأسعاره."),
+                        if (opening) tr("سجّل هنا البضاعة الموجودة عندك الآن: امسح كود كل منتج واكتب كميته وسعر شرائه وسعر بيعه.\nلا يخرج أي مبلغ من الصندوق.")
+                        else tr("امسح الكود بار للمنتج.\nإذا كان جديدًا سيُطلب منك اسمه وأسعاره."),
                         textAlign = TextAlign.Center,
                     )
                 }
