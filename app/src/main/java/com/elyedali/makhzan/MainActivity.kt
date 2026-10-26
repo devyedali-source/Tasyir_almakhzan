@@ -420,7 +420,7 @@ private fun AppRoot(
         is Route.Settings -> SettingsScreen(dao, r.shopId, onBack = ::back, onPreview = { go(Route.Invoice(r.shopId, null)) })
         is Route.Invoice -> InvoiceScreen(dao, r.shopId, r.opId, onBack = ::back)
         is Route.AdminActivate -> AdminActivateScreen(r.req, onBack = ::back)
-        Route.AdminPanel -> AdminPanelScreen(onBack = ::back, onActivate = { go(Route.AdminActivate(it)) })
+        Route.AdminPanel -> AdminPanelScreen(dao, onBack = ::back, onActivate = { go(Route.AdminActivate(it)) })
         is Route.Workers -> WorkersScreen(dao, r.shopId, onBack = ::back, onEnterWorkerMode = { stack = listOf(Route.Shops); workerShop = r.shopId })
         is Route.Reports -> ReportsScreen(dao, r.shopId, onBack = ::back, onPdf = { path, title -> go(Route.PdfView(r.shopId, path, title)) })
         is Route.PdfView -> PdfViewScreen(r.path, r.title, onBack = ::back)

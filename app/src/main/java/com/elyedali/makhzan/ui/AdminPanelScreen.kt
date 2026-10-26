@@ -38,13 +38,27 @@ import com.elyedali.makhzan.activation.Activation
 import com.elyedali.makhzan.activation.ActivationRequest
 import com.elyedali.makhzan.auth.Auth
 import com.elyedali.makhzan.i18n.tr
+import com.elyedali.makhzan.data.DemoData
+import com.elyedali.makhzan.data.ShopDao
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * لوحة مدير التطبيق (للحساب المسؤول فقط): أرقام فقط، بعمليات عدّ رخيصة على الخادم،
  * وزر التفعيل من رابط واتساب منسوخ.
  */
 @Composable
-fun AdminPanelScreen(onBack: () -> Unit, onActivate: (ActivationRequest) -> Unit) {
+fun AdminPanelScreen(dao: ShopDao, onBack: () -> Unit, onActivate: (ActivationRequest) -> Unit) {
+    val demo by dao.demoShop().collectAsState(initial = null)
+    var demoBusy by remember { mutableStateOf(false) }
+    var confirmDeleteDemo by remember { mutableStateOf(false) }
+    var demoMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     var stats by remember { mutableStateOf<Activation.AdminStats?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -92,6 +106,43 @@ fun AdminPanelScreen(onBack: () -> Unit, onActivate: (ActivationRequest) -> Unit
                 Text("  " + tr("تفعيل من رابط منسوخ"))
             }
 
+            // محل تجريبي ببيانات افتراضية لشهر كامل (يبقى على هذا الهاتف فقط ولا يُرسل إلى الخادم)
+            SectionLabel(tr("المحل التجريبي"))
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        tr("محل فيه بيانات افتراضية لشهر كامل: منتجات، مبيعات، ديون، موردون، مصاريف، مرتجع وتالف — لتجربة كل الشاشات والتقارير."),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    val d = demo
+                    if (demoBusy) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.size(22.dp))
+                            Text("  " + tr("جارٍ التحضير…"))
+                        }
+                    } else if (d == null) {
+                        OutlinedButton(onClick = {
+                            demoBusy = true
+                            scope.launch {
+                                demoMessage = try {
+                                    DemoData.create(dao)
+                                    tr("تم إنشاء «محل تجريبي». ستجده في قائمة المحلات.")
+                                } catch (e: Exception) {
+                                    tr("تعذر الإنشاء: %1\$s", e.message ?: "")
+                                }
+                                demoBusy = false
+                            }
+                        }) { Text(tr("إنشاء محل تجريبي")) }
+                    } else {
+                        Text(tr("موجود: %1\$s", d.name), fontWeight = FontWeight.SemiBold)
+                        TextButton(onClick = { confirmDeleteDemo = true }) {
+                            Text(tr("حذف المحل التجريبي"), color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                    demoMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                }
+            }
+
             if (loading) CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
@@ -115,6 +166,27 @@ fun AdminPanelScreen(onBack: () -> Unit, onActivate: (ActivationRequest) -> Unit
                 }
             }
         }
+    }
+
+    val d = demo
+    if (confirmDeleteDemo && d != null) {
+        AlertDialog(
+            onDismissRequest = { confirmDeleteDemo = false },
+            title = { Text(tr("حذف المحل التجريبي")) },
+            text = { Text(tr("ستُحذف كل بياناته الافتراضية. محلاتك الحقيقية لا تتأثر.")) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDeleteDemo = false
+                    demoBusy = true
+                    scope.launch {
+                        DemoData.delete(dao, d.id)
+                        demoMessage = tr("تم الحذف")
+                        demoBusy = false
+                    }
+                }) { Text(tr("حذف"), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDeleteDemo = false }) { Text(tr("إلغاء")) } },
+        )
     }
 }
 

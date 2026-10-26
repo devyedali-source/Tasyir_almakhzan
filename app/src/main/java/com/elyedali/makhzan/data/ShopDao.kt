@@ -24,7 +24,7 @@ abstract class ShopDao {
     @Insert
     abstract suspend fun insertShop(shop: Shop): Long
 
-    @Query("SELECT MIN(id) FROM shops")
+    @Query("SELECT MIN(id) FROM shops WHERE remoteId NOT LIKE 'demo-%'")
     abstract fun firstShopId(): Flow<Long?>
 
     @Query("SELECT * FROM shops WHERE remoteId = :remoteId LIMIT 1")
@@ -661,6 +661,46 @@ abstract class ShopDao {
         }
         deleteLines(opId)
         deleteOperation(opId)
+    }
+
+    // ---------- حذف محل كامل (المحل التجريبي فقط) ----------
+    @Query("DELETE FROM operation_lines WHERE opId IN (SELECT id FROM operations WHERE shopId = :shopId)")
+    abstract suspend fun deleteShopLines(shopId: Long)
+
+    @Query("DELETE FROM operations WHERE shopId = :shopId")
+    abstract suspend fun deleteShopOperations(shopId: Long)
+
+    @Query("DELETE FROM products WHERE shopId = :shopId")
+    abstract suspend fun deleteShopProducts(shopId: Long)
+
+    @Query("DELETE FROM customers WHERE shopId = :shopId")
+    abstract suspend fun deleteShopCustomers(shopId: Long)
+
+    @Query("DELETE FROM suppliers WHERE shopId = :shopId")
+    abstract suspend fun deleteShopSuppliers(shopId: Long)
+
+    @Query("DELETE FROM workers WHERE shopId = :shopId")
+    abstract suspend fun deleteShopWorkers(shopId: Long)
+
+    @Query("DELETE FROM shop_profile WHERE shopId = :shopId")
+    abstract suspend fun deleteShopProfile(shopId: Long)
+
+    @Query("DELETE FROM shops WHERE id = :shopId")
+    abstract suspend fun deleteShopRow(shopId: Long)
+
+    @Query("SELECT * FROM shops WHERE remoteId LIKE 'demo-%' LIMIT 1")
+    abstract fun demoShop(): Flow<Shop?>
+
+    @Transaction
+    open suspend fun deleteShopCompletely(shopId: Long) {
+        deleteShopLines(shopId)
+        deleteShopOperations(shopId)
+        deleteShopProducts(shopId)
+        deleteShopCustomers(shopId)
+        deleteShopSuppliers(shopId)
+        deleteShopWorkers(shopId)
+        deleteShopProfile(shopId)
+        deleteShopRow(shopId)
     }
 }
 
