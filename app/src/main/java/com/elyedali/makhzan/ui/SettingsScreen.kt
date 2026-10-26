@@ -51,6 +51,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.elyedali.makhzan.data.Money
+import com.elyedali.makhzan.data.Plans
+import com.elyedali.makhzan.data.TrustedClock
 import com.elyedali.makhzan.data.ShopDao
 import com.elyedali.makhzan.data.ShopProfile
 import kotlinx.coroutines.Dispatchers
@@ -74,7 +76,9 @@ private val languages = listOf(
 )
 
 @Composable
-fun SettingsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPreview: () -> Unit) {
+fun SettingsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPreview: () -> Unit, onShopDeleted: () -> Unit) {
+    var confirmDeleteShop by remember { mutableStateOf(false) }
+    var shopActive by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -96,6 +100,7 @@ fun SettingsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPreview: ()
         val shop = dao.shopNow(shopId)
         val p = dao.profileNow(shopId) ?: ShopProfile(shopId = shopId)
         name = shop?.name ?: ""
+        shopActive = shop?.let { Plans.isActive(it, TrustedClock.now()) } == true
         address = p.address; phone = p.phone; email = p.email; tax = p.taxNumber
         logoPath = p.logoPath; design = p.design; language = p.language; stamp = p.showStamp
         currency = p.currency
@@ -201,7 +206,32 @@ fun SettingsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPreview: ()
                     scope.launch { if (save()) onPreview() }
                 }) { Text(tr("معاينة الفاتورة")) }
             }
+
+            // منطقة الخطر: حذف المحل نهائيًا (يتطلب كتابة 9999)
+            Spacer(Modifier.size(24.dp))
+            HorizontalDivider()
+            TextButton(onClick = { confirmDeleteShop = true }) {
+                Text(tr("حذف هذا المحل نهائيًا"), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+            }
         }
+    }
+
+    if (confirmDeleteShop) {
+        CodeConfirmDialog(
+            title = tr("حذف المحل «%1\$s»", name),
+            message = tr("سيُحذف هذا المحل بكل بياناته: المنتجات والمخزون والصندوق والمبيعات والديون والموردون والعمال والتقارير. لا يمكن التراجع عن ذلك، وسيُحذف أيضًا من النسخة على Google Drive عند الحفظ القادم.") +
+                if (shopActive) "\n\n" + tr("تنبيه: هذا المحل مفعّل، وسيضيع ما بقي من مدة تفعيله.") else "",
+            onDismiss = { confirmDeleteShop = false },
+            onConfirm = {
+                confirmDeleteShop = false
+                scope.launch {
+                    val logo = dao.profileNow(shopId)?.logoPath
+                    dao.deleteShopCompletely(shopId)
+                    logo?.let { runCatching { File(it).delete() } }
+                    onShopDeleted()
+                }
+            },
+        )
     }
 }
 

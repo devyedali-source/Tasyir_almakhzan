@@ -3,6 +3,15 @@ package com.elyedali.makhzan.i18n
 /** قواميس الترجمة: المفتاح هو النص العربي كما هو في الواجهة */
 internal object Translations {
     val fr: Map<String, String> = hashMapOf(
+        "إفراغ السلة؟" to "Vider le panier ?",
+        "تنبيه: هذا المحل مفعّل، وسيضيع ما بقي من مدة تفعيله." to "Attention : cette boutique est activée, la durée d'activation restante sera perdue.",
+        "حذف المحل «%1\$s»" to "Supprimer la boutique « %1\$s »",
+        "حذف نهائي" to "Supprimer définitivement",
+        "حذف هذا المحل نهائيًا" to "Supprimer définitivement cette boutique",
+        "رمز التأكيد" to "Code de confirmation",
+        "ستُحذف كل المنتجات من السلة. لم يُسجَّل منها شيء بعد." to "Tous les produits du panier seront retirés. Rien n'a encore été enregistré.",
+        "سيُحذف هذا المحل بكل بياناته: المنتجات والمخزون والصندوق والمبيعات والديون والموردون والعمال والتقارير. لا يمكن التراجع عن ذلك، وسيُحذف أيضًا من النسخة على Google Drive عند الحفظ القادم." to "Cette boutique sera supprimée avec toutes ses données : produits, stock, caisse, ventes, dettes, fournisseurs, employés et rapports. C'est irréversible, et elle sera aussi retirée de la sauvegarde Google Drive au prochain enregistrement.",
+        "للتأكيد اكتب الرقم %1\$s" to "Pour confirmer, tapez %1\$s",
         "إنشاء محل تجريبي" to "Créer une boutique de démonstration",
         "الشيخ أحمد" to "Cheikh Ahmed",
         "العامل أحمد" to "Ahmed (employé)",
@@ -565,6 +574,15 @@ internal object Translations {
     )
 
     val en: Map<String, String> = hashMapOf(
+        "إفراغ السلة؟" to "Empty the cart?",
+        "تنبيه: هذا المحل مفعّل، وسيضيع ما بقي من مدة تفعيله." to "Warning: this shop is activated; the remaining activation time will be lost.",
+        "حذف المحل «%1\$s»" to "Delete the shop “%1\$s”",
+        "حذف نهائي" to "Delete permanently",
+        "حذف هذا المحل نهائيًا" to "Delete this shop permanently",
+        "رمز التأكيد" to "Confirmation code",
+        "ستُحذف كل المنتجات من السلة. لم يُسجَّل منها شيء بعد." to "All products will be removed from the cart. Nothing has been recorded yet.",
+        "سيُحذف هذا المحل بكل بياناته: المنتجات والمخزون والصندوق والمبيعات والديون والموردون والعمال والتقارير. لا يمكن التراجع عن ذلك، وسيُحذف أيضًا من النسخة على Google Drive عند الحفظ القادم." to "This shop will be deleted with all its data: products, stock, cash, sales, debts, suppliers, employees and reports. This can't be undone, and it will also be removed from the Google Drive backup at the next save.",
+        "للتأكيد اكتب الرقم %1\$s" to "To confirm, type %1\$s",
         "إنشاء محل تجريبي" to "Create a demo shop",
         "الشيخ أحمد" to "Cheikh Ahmed",
         "العامل أحمد" to "Ahmed (employee)",

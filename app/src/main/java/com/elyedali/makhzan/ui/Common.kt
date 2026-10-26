@@ -115,3 +115,51 @@ fun ErrorText(text: String?) {
         }
     }
 }
+
+/** رمز تأكيد الحذف النهائي (يُكتب يدويًا حتى لا يحدث حذف بالغلط) */
+const val DELETE_CODE = "9999"
+
+/**
+ * نافذة تحذير للحذف الخطير: لا يُفعَّل زر الحذف إلا بعد كتابة 9999.
+ */
+@Composable
+fun CodeConfirmDialog(
+    title: String,
+    message: String,
+    confirmText: String = tr("حذف نهائي"),
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    var code by remember { mutableStateOf("") }
+    val ok = code.trim() == DELETE_CODE
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, color = MaterialTheme.colorScheme.error) },
+        text = {
+            Column {
+                Text(message)
+                Spacer(Modifier.height(10.dp))
+                Text(tr("للتأكيد اكتب الرقم %1\$s", DELETE_CODE), style = MaterialTheme.typography.bodySmall)
+                NumberField(code, { code = it }, tr("رمز التأكيد"))
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = ok, onClick = onConfirm) {
+                Text(confirmText, color = if (ok) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("إلغاء")) } },
+    )
+}
+
+/** تحذير بسيط قبل إفراغ سلة لم تُؤكَّد بعد */
+@Composable
+fun ConfirmClearDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr("إفراغ السلة؟")) },
+        text = { Text(tr("ستُحذف كل المنتجات من السلة. لم يُسجَّل منها شيء بعد.")) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(tr("إفراغ"), color = MaterialTheme.colorScheme.error) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("تراجع")) } },
+    )
+}

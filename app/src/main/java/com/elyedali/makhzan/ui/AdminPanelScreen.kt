@@ -170,22 +170,19 @@ fun AdminPanelScreen(dao: ShopDao, onBack: () -> Unit, onActivate: (ActivationRe
 
     val d = demo
     if (confirmDeleteDemo && d != null) {
-        AlertDialog(
-            onDismissRequest = { confirmDeleteDemo = false },
-            title = { Text(tr("حذف المحل التجريبي")) },
-            text = { Text(tr("ستُحذف كل بياناته الافتراضية. محلاتك الحقيقية لا تتأثر.")) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDeleteDemo = false
-                    demoBusy = true
-                    scope.launch {
-                        DemoData.delete(dao, d.id)
-                        demoMessage = tr("تم الحذف")
-                        demoBusy = false
-                    }
-                }) { Text(tr("حذف"), color = MaterialTheme.colorScheme.error) }
+        CodeConfirmDialog(
+            title = tr("حذف المحل التجريبي"),
+            message = tr("ستُحذف كل بياناته الافتراضية. محلاتك الحقيقية لا تتأثر."),
+            onDismiss = { confirmDeleteDemo = false },
+            onConfirm = {
+                confirmDeleteDemo = false
+                demoBusy = true
+                scope.launch {
+                    DemoData.delete(dao, d.id)
+                    demoMessage = tr("تم الحذف")
+                    demoBusy = false
+                }
             },
-            dismissButton = { TextButton(onClick = { confirmDeleteDemo = false }) { Text(tr("إلغاء")) } },
         )
     }
 }

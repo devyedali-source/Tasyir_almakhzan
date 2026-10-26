@@ -89,6 +89,7 @@ fun SaleScreen(
     var showCreditPicker by remember { mutableStateOf(false) }
     var showDiscount by remember { mutableStateOf(false) }
     var discount by remember { mutableStateOf(0L) }
+    var confirmClear by remember { mutableStateOf(false) }
     fun tryBack() { if (cart.isNotEmpty()) confirmLeave = true else onBack() }
     BackHandler(enabled = cart.isNotEmpty()) { confirmLeave = true }
 
@@ -227,7 +228,7 @@ fun SaleScreen(
                         Text(" " + tr("بحث"))
                     }
                     if (allowDiscount && cart.isNotEmpty()) TextButton(onClick = { showDiscount = true }) { Text(tr("تخفيض")) }
-                    if (cart.isNotEmpty()) TextButton(onClick = { cart.clear(); discount = 0L }) { Text(tr("إفراغ")) }
+                    if (cart.isNotEmpty()) TextButton(onClick = { confirmClear = true }) { Text(tr("إفراغ")) }
                 }
             }
             if (cart.isEmpty()) {
@@ -389,6 +390,14 @@ fun SaleScreen(
             onDismiss = { showCreditPicker = false },
             onPick = { id -> showCreditPicker = false; confirmSale(id) },
         )
+    }
+
+    if (confirmClear) {
+        ConfirmClearDialog(onDismiss = { confirmClear = false }, onConfirm = {
+            confirmClear = false
+            cart.clear()
+            discount = 0L
+        })
     }
 
     if (confirmLeave) {

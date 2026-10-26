@@ -417,7 +417,10 @@ private fun AppRoot(
         is Route.Suppliers -> SuppliersScreen(dao, r.shopId, onBack = ::back, onOpen = { go(Route.SupplierDetail(r.shopId, it)) })
         is Route.SupplierDetail -> SupplierDetailScreen(dao, r.shopId, r.supplierId, onBack = ::back)
         is Route.ProductDetail -> ProductDetailScreen(dao, r.productId, onBack = ::back)
-        is Route.Settings -> SettingsScreen(dao, r.shopId, onBack = ::back, onPreview = { go(Route.Invoice(r.shopId, null)) })
+        is Route.Settings -> SettingsScreen(
+            dao, r.shopId, onBack = ::back, onPreview = { go(Route.Invoice(r.shopId, null)) },
+            onShopDeleted = { stack = listOf(Route.Shops) },
+        )
         is Route.Invoice -> InvoiceScreen(dao, r.shopId, r.opId, onBack = ::back)
         is Route.AdminActivate -> AdminActivateScreen(r.req, onBack = ::back)
         Route.AdminPanel -> AdminPanelScreen(dao, onBack = ::back, onActivate = { go(Route.AdminActivate(it)) })

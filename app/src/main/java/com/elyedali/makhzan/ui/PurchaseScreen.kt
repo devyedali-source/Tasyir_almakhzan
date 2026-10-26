@@ -73,6 +73,7 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
     var activationCount by remember { mutableStateOf(0) }
 
     var confirmLeave by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
     fun tryBack() { if (cart.isNotEmpty()) confirmLeave = true else onBack() }
     BackHandler(enabled = cart.isNotEmpty()) { confirmLeave = true }
 
@@ -189,7 +190,7 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
                 Row {
                     // سلعة لا تحمل كودًا (خبز، سلع سائبة…): يُنشأ لها رمز داخلي وتُباع من زر «بحث» في شاشة البيع
                     TextButton(onClick = { onScanned("IN-" + java.lang.Long.toString(System.currentTimeMillis(), 36).uppercase()) }) { Text(tr("بلا كود")) }
-                    if (cart.isNotEmpty()) TextButton(onClick = { cart.clear() }) { Text(tr("إفراغ")) }
+                    if (cart.isNotEmpty()) TextButton(onClick = { confirmClear = true }) { Text(tr("إفراغ")) }
                 }
             }
             if (cart.isEmpty()) {
@@ -268,6 +269,10 @@ fun PurchaseScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit) {
     }
     activationShop?.let { sh ->
         ActivationDialog(dao, sh, activationCount, onDismiss = { activationShop = null })
+    }
+
+    if (confirmClear) {
+        ConfirmClearDialog(onDismiss = { confirmClear = false }, onConfirm = { confirmClear = false; cart.clear() })
     }
 
     if (confirmLeave) {
