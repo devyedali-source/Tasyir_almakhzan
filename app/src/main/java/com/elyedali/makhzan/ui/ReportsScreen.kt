@@ -104,6 +104,8 @@ fun ReportsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPdf: (path: 
             discounts = dao.discountsRange(shopId, from, toExclusive),
             adjustLoss = dao.sumTypeRange(shopId, OpType.ADJUST, from, toExclusive),
             profit = dao.profitRange(shopId, from, toExclusive),
+            deposits = dao.sumTypeRange(shopId, OpType.DEPOSIT, from, toExclusive),
+            withdrawals = dao.sumTypeRange(shopId, OpType.WITHDRAW, from, toExclusive),
         )
     }
 
@@ -158,6 +160,8 @@ fun ReportsScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onPdf: (path: 
                     if (s.creditPurchases != 0L) Line(tr("المشتريات بالدَّين"), s.creditPurchases, Color(0xFF7B1FA2))
                     if (s.supplierPayments != 0L) Line(tr("المدفوع للموردين"), s.supplierPayments, Color(0xFFC62828))
                     Line(tr("المصاريف"), s.expenses, Color(0xFFC62828))
+                    if (s.deposits != 0L) Line(tr("الإيداعات"), s.deposits, Color(0xFF0B6E4F))
+                    if (s.withdrawals != 0L) Line(tr("سحب صاحب المحل"), s.withdrawals, Color(0xFFC62828))
                     Line(tr("رصيد نهاية الفترة"), s.closingCash, bold = true)
                     if (s.discounts != 0L) Line(tr("التخفيضات الممنوحة"), s.discounts)
                     Line(tr("ربح المبيعات"), s.profit)

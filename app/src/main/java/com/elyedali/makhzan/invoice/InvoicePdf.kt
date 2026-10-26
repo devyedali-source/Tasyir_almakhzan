@@ -27,6 +27,8 @@ data class InvoiceData(
     /** اسم الزبون في البيع بالدَّين (null = بيع نقدي) */
     val creditCustomer: String? = null,
     val discount: Long = 0,
+    /** ما دفعه الزبون عند البيع بالدَّين */
+    val paidNow: Long = 0,
 ) {
     val subtotal: Long get() = lines.sumOf { it.amount }
     val total: Long get() = subtotal - discount
@@ -60,6 +62,9 @@ class Labels(val lang: String, customCurrency: String = "") {
     val customer = t("الزبون", "Client", "Customer")
     val credit = t("بيع بالدَّين — غير مدفوع", "Vente à crédit — non payée", "Credit sale — unpaid")
     val subtotal = t("المجموع قبل التخفيض", "Sous-total", "Subtotal")
+    val paid = t("المدفوع", "Payé", "Paid")
+    val remaining = t("الباقي دينًا", "Reste à payer", "Balance due")
+    val creditPartial = t("بيع بالدَّين", "Vente à crédit", "Credit sale")
     val discount = t("التخفيض", "Remise", "Discount")
     private val kg = t("كغ", "kg", "kg")
     private val litre = t("لتر", "L", "L")
@@ -266,7 +271,7 @@ object InvoicePdf {
             data.creditCustomer?.let { name ->
                 after += 16
                 c.textStart("${labels.customer}: $name", L, R, after, paint(10.5f, true), rtl)
-                c.textEnd(labels.credit, L, R, after, paint(10.5f, true, Color.rgb(180, 83, 9)), rtl)
+                c.textEnd(if (data.paidNow > 0) labels.creditPartial else labels.credit, L, R, after, paint(10.5f, true, Color.rgb(180, 83, 9)), rtl)
             }
             return after + 18
         }
@@ -324,6 +329,15 @@ object InvoicePdf {
             val tColor = if (modern) Color.WHITE else ink
             c.textStart(labels.total, box.left + 8, box.right - 8, y + 20, paint(12f, true, tColor), rtl)
             c.textEnd(labels.money(data.total), box.left + 8, box.right - 8, y + 20, paint(12f, true, tColor), rtl)
+            if (data.creditCustomer != null && data.paidNow > 0) {
+                val bL = if (rtl) L else R - boxW
+                val bR = if (rtl) L + boxW else R
+                c.textStart(labels.paid, bL + 8, bR - 8, y + 48, paint(10.5f), rtl)
+                c.textEnd(labels.money(data.paidNow), bL + 8, bR - 8, y + 48, paint(10.5f), rtl)
+                c.textStart(labels.remaining, bL + 8, bR - 8, y + 66, paint(10.5f, true), rtl)
+                c.textEnd(labels.money(data.total - data.paidNow), bL + 8, bR - 8, y + 66, paint(10.5f, true), rtl)
+                y += 40
+            }
             val countL = if (rtl) L + boxW + 10 else L
             val countR = if (rtl) R else R - boxW - 10
             c.textStart("${labels.itemsCount}: ${data.lines.size}", countL, countR, y + 20, paint(10f), rtl)
@@ -355,7 +369,7 @@ object InvoicePdf {
         fun draw() {
             val infoLines = listOf(profile.address, profile.phone, profile.email, profile.taxNumber).count { it.isNotBlank() }
             val height = (20 + (if (logo != null) 70 else 0) + 26 + infoLines * 13 + 80 +
-                data.lines.size * 30 + 70 + (if (data.discount > 0) 30 else 0) + (if (data.creditCustomer != null) 24 else 0) + (if (profile.showStamp) 130 else 0) + 30)
+                data.lines.size * 30 + 70 + (if (data.discount > 0) 30 else 0) + (if (data.creditCustomer != null) 60 else 0) + (if (profile.showStamp) 130 else 0) + 30)
             val page = doc.startPage(PdfDocument.PageInfo.Builder(RECEIPT_W, height, 1).create())
             val c = page.canvas
             var y = 14f
@@ -384,7 +398,7 @@ object InvoicePdf {
                 y += 12
                 c.textCenter("${labels.customer}: $name", L, R, y, paint(8.5f, true))
                 y += 12
-                c.textCenter(labels.credit, L, R, y, paint(8.5f, true))
+                c.textCenter(if (data.paidNow > 0) labels.creditPartial else labels.credit, L, R, y, paint(8.5f, true))
             }
             y += 8
             c.drawLine(L, y, R, y, dash)
@@ -411,6 +425,14 @@ object InvoicePdf {
             c.textStart(labels.total, L, R, y, paint(11f, true), rtl)
             c.textEnd(labels.money(data.total), L, R, y, paint(11f, true), rtl)
             y += 22
+            if (data.creditCustomer != null && data.paidNow > 0) {
+                c.textStart(labels.paid, L, R, y, pDet, rtl)
+                c.textEnd(labels.plain(data.paidNow), L, R, y, pDet, rtl)
+                y += 14
+                c.textStart(labels.remaining, L, R, y, paint(9f, true), rtl)
+                c.textEnd(labels.plain(data.total - data.paidNow), L, R, y, paint(9f, true), rtl)
+                y += 20
+            }
             if (profile.showStamp) {
                 val r = 52f
                 c.drawStamp(RECEIPT_W / 2f, y + r + 4, r, shopName, profile, labels)

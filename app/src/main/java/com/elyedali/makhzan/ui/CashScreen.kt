@@ -48,6 +48,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.text.input.KeyboardType
 import com.elyedali.makhzan.data.ShopDao
@@ -79,7 +80,12 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
     val debts by dao.totalDebt(shopId).collectAsState(initial = 0L)
     val profit by remember(from) { dao.profit(shopId, from) }.collectAsState(initial = 0L)
     val ops by remember(from) { dao.operations(shopId, from) }.collectAsState(initial = emptyList())
+    val deposits by remember(from) { dao.sumType(shopId, OpType.DEPOSIT, from) }.collectAsState(initial = 0L)
+    val withdrawals by remember(from) { dao.sumType(shopId, OpType.WITHDRAW, from) }.collectAsState(initial = 0L)
     var opened by remember { mutableStateOf<Operation?>(null) }
+    /** OpType.DEPOSIT أو OpType.WITHDRAW */
+    var moveType by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     Scaffold(topBar = { AppTopBar(tr("الصندوق"), onBack) }, bottomBar = { AdBanner(dao) }) { pad ->
         LazyColumn(
@@ -101,6 +107,13 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                             color = if (balance < 0) Color(0xFFFFCDD2) else Color.White,
                         )
                     }
+                }
+            }
+            item {
+                // إيداع: رصيد افتتاحي أو مال يضعه صاحب المحل. سحب: ما يأخذه صاحب المحل لنفسه (ليس مصروفًا)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = { moveType = OpType.DEPOSIT }, modifier = Modifier.weight(1f)) { Text(tr("إيداع في الصندوق")) }
+                    OutlinedButton(onClick = { moveType = OpType.WITHDRAW }, modifier = Modifier.weight(1f)) { Text(tr("سحب من الصندوق")) }
                 }
             }
             item {
@@ -131,6 +144,12 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         StatTile(tr("المدفوع للموردين"), supplierPaid, Color(0xFF7B1FA2), Modifier.weight(1f))
                         StatTile(tr("على المحل للموردين"), supplierDebt, Color(0xFF7B1FA2), Modifier.weight(1f))
+                    }
+                    if (deposits != 0L || withdrawals != 0L) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            StatTile(tr("الإيداعات"), deposits, InColor, Modifier.weight(1f))
+                            StatTile(tr("سحب صاحب المحل"), withdrawals, OutColor, Modifier.weight(1f))
+                        }
                     }
                     // الربح الصافي = ربح المبيعات − المصاريف − خسائر المخزون (التالف والضائع وفروق الجرد)
                     val net = profit - expenses - adjustLoss
@@ -168,6 +187,48 @@ fun CashScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, onInvoice: (Long)
                 }
             }
         }
+    }
+
+    moveType?.let { type ->
+        val isDeposit = type == OpType.DEPOSIT
+        var amount by remember(type) { mutableStateOf("") }
+        var note by remember(type) { mutableStateOf("") }
+        val v = Money.parse(amount)
+        val tooMuch = !isDeposit && v != null && v > balance
+        AlertDialog(
+            onDismissRequest = { moveType = null },
+            title = { Text(if (isDeposit) tr("إيداع في الصندوق") else tr("سحب من الصندوق")) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        if (isDeposit) tr("مثلًا: المال الموجود في الصندوق عند بدء استعمال التطبيق، أو مال تضعه من جيبك. لا يُحسب ربحًا.")
+                        else tr("ما تأخذه لنفسك من الصندوق. لا يُحسب مصروفًا ولا ينقص الربح."),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    MoneyField(amount, { amount = it }, tr("المبلغ"))
+                    OutlinedTextField(
+                        value = note, onValueChange = { note = it }, singleLine = true,
+                        label = { Text(tr("ملاحظة (اختياري)")) }, modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (tooMuch) ErrorText(tr("المبلغ أكبر من رصيد الصندوق (%1\$s)", Money.format(balance)))
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = v != null && v > 0 && !tooMuch, onClick = {
+                    moveType = null
+                    scope.launch {
+                        dao.insertOperation(
+                            Operation(
+                                shopId = shopId, type = type, total = v!!,
+                                note = note.trim().ifBlank { if (isDeposit && balance == 0L) tr("رصيد افتتاحي") else "" },
+                                time = TrustedClock.now(),
+                            )
+                        )
+                    }
+                }) { Text(tr("حفظ")) }
+            },
+            dismissButton = { TextButton(onClick = { moveType = null }) { Text(tr("إلغاء")) } },
+        )
     }
 
     opened?.let { op ->

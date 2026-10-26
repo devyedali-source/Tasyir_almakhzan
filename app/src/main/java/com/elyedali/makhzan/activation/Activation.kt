@@ -27,7 +27,8 @@ data class ActivationRequest(
     val shopRemoteId: String,
     val tier: Int,
     val shopName: String,
-    val ownerEmail: String,
+    /** اسم صاحب المحل كما في حسابه على Google (لا يُرسل البريد في الرابط) */
+    val ownerName: String,
 )
 
 /**
@@ -63,18 +64,21 @@ object Activation {
             .appendQueryParameter("s", shop.remoteId)
             .appendQueryParameter("t", tier.toString())
             .appendQueryParameter("n", shop.name)
-            .appendQueryParameter("e", user?.email ?: "")
+            .appendQueryParameter("o", ownerName())
             .build().toString()
     }
 
+    /** اسم صاحب الحساب على Google */
+    private fun ownerName(): String = Auth.auth.currentUser?.displayName?.trim().orEmpty()
+
+    /** رسالة واتساب: صاحب المحل، اسم المحل، الباقة ورابط التفعيل فقط (دون البريد ولا رقم المحل) */
     fun buildMessage(shop: Shop, tier: Int): String {
         val p = plan(tier) ?: plans.first()
-        val email = Auth.auth.currentUser?.email ?: ""
+        val name = ownerName()
         return "السلام عليكم،\n" +
-            "أنا صاحب الحساب: $email\n" +
-            "أريد تفعيل المحل التجاري: ${shop.name}\n" +
-            "الباقة: ${p.label} — ${p.price} أوقية لمدة $MONTHS أشهر\n\n" +
-            "🔑 رقم المحل: ${shop.remoteId.take(8).uppercase()}\n" +
+            (if (name.isNotBlank()) "صاحب المحل: $name\n" else "") +
+            "اسم المحل: ${shop.name}\n" +
+            "الباقة: ${p.label} — ${p.price} أوقية لمدة $MONTHS أشهر\n" +
             "------------------------------------\n" +
             "رابط التفعيل:\n" +
             buildLink(shop, tier)
@@ -94,7 +98,7 @@ object Activation {
         return ActivationRequest(
             ownerUid = u, shopRemoteId = s, tier = t,
             shopName = uri.getQueryParameter("n").orEmpty(),
-            ownerEmail = uri.getQueryParameter("e").orEmpty(),
+            ownerName = uri.getQueryParameter("o").orEmpty(),
         )
     }
 
@@ -166,7 +170,6 @@ object Activation {
                 ref,
                 mapOf(
                     "ownerUid" to req.ownerUid,
-                    "ownerEmail" to req.ownerEmail,
                     "shopName" to req.shopName,
                     "tier" to req.tier,
                     "expiresAt" to newExp,

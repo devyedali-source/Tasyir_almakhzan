@@ -199,7 +199,7 @@ fun ProductDetailScreen(dao: ShopDao, productId: Long, onBack: () -> Unit) {
                 val q = when (m.type) {
                     OpType.PURCHASE, OpType.RETURN, OpType.OPENING -> m.line.qty
                     OpType.ADJUST -> m.line.qty
-                    else -> -m.line.qty
+                    else -> -m.line.qty // البيع والإرجاع للمورد
                 }
                 val isIn = q > 0
                 Card(Modifier.fillMaxWidth()) {
@@ -211,6 +211,7 @@ fun ProductDetailScreen(dao: ShopDao, productId: Long, onBack: () -> Unit) {
                                     OpType.OPENING -> tr("دخول (مخزون افتتاحي)")
                                     OpType.RETURN -> tr("دخول (مرتجع)")
                                     OpType.ADJUST -> if (isIn) tr("زيادة (تسوية)") else tr("نقص (تسوية)")
+                                    OpType.SUPPLIER_RETURN -> tr("خروج (إرجاع للمورد)")
                                     else -> tr("خروج (بيع)")
                                 },
                                 style = MaterialTheme.typography.titleSmall,

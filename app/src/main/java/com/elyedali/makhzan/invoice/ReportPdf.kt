@@ -52,6 +52,10 @@ data class PeriodSummary(
     /** خسائر المخزون بسعر الشراء (التالف والضائع وفروق الجرد) */
     val adjustLoss: Long,
     val profit: Long,
+    /** مال وضعه صاحب المحل في الصندوق (رصيد افتتاحي أو رأس مال) */
+    val deposits: Long = 0,
+    /** ما سحبه صاحب المحل لنفسه */
+    val withdrawals: Long = 0,
 ) {
     val netProfit: Long get() = profit - expenses - adjustLoss
 }
@@ -182,6 +186,8 @@ object ReportPdf {
             w.row(tr("المشتريات النقدية"), "−" + Money.format(s.purchases))
             if (s.supplierPayments != 0L) w.row(tr("المدفوع للموردين"), "−" + Money.format(s.supplierPayments))
             w.row(tr("المصاريف"), "−" + Money.format(s.expenses))
+            if (s.deposits != 0L) w.row(tr("الإيداعات"), "+" + Money.format(s.deposits))
+            if (s.withdrawals != 0L) w.row(tr("سحب صاحب المحل"), "−" + Money.format(s.withdrawals))
             w.row(tr("رصيد نهاية الفترة"), Money.format(s.closingCash), bold = true)
             w.section(tr("النتيجة"))
             val net = s.cashSales + s.creditSales - s.cashReturns - s.creditReturns
@@ -297,12 +303,13 @@ object ReportPdf {
             w.newPage()
             var balance = 0L
             val rows = ops.map { op ->
-                val effect = if (op.type == OpType.SALE) op.total else -op.total
+                val effect = if (op.type == OpType.SALE || op.type == OpType.OLD_DEBT) op.total else -op.total
                 balance += effect
                 listOf(
                     Dates.format(op.time),
                     when (op.type) {
                         OpType.SALE -> tr("شراء بالدَّين")
+                        OpType.OLD_DEBT -> tr("دين سابق")
                         OpType.PAYMENT -> if (op.total < 0) tr("ردّ مال لزبون") else tr("تسديد")
                         else -> tr("مرتجع")
                     },

@@ -184,6 +184,7 @@ internal suspend fun loadInvoice(dao: ShopDao, opId: Long): InvoiceData? {
         },
         creditCustomer = op.customerId?.let { dao.customerNow(it)?.name },
         discount = op.discount,
+        paidNow = if (op.customerId != null) (dao.refundPaymentFor(op.id)?.total ?: 0L).coerceAtLeast(0L) else 0L,
     )
 }
 

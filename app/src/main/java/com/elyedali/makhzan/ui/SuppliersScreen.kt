@@ -45,6 +45,14 @@ import androidx.compose.ui.unit.dp
 import com.elyedali.makhzan.data.Dates
 import com.elyedali.makhzan.data.Money
 import com.elyedali.makhzan.data.OpType
+import com.elyedali.makhzan.data.Operation
+import com.elyedali.makhzan.data.Qty
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.text.input.KeyboardType
 import com.elyedali.makhzan.data.ShopDao
 import com.elyedali.makhzan.data.Supplier
 import com.elyedali.makhzan.data.TrustedClock
@@ -144,6 +152,8 @@ fun SupplierDetailScreen(dao: ShopDao, shopId: Long, supplierId: Long, onBack: (
     val ops by dao.supplierOperations(supplierId).collectAsState(initial = emptyList())
     var showPay by remember { mutableStateOf(false) }
     var showEdit by remember { mutableStateOf(false) }
+    var showOldDebt by remember { mutableStateOf(false) }
+    var showReturn by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -178,17 +188,36 @@ fun SupplierDetailScreen(dao: ShopDao, shopId: Long, supplierId: Long, onBack: (
                         enabled = debt > 0, onClick = { showPay = true },
                         modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp),
                     ) { Text(tr("دفع للمورد")) }
-                    TextButton(onClick = { showEdit = true }) { Text(tr("تعديل الاسم والهاتف")) }
+                    OutlinedButton(
+                        enabled = debt > 0, onClick = { showReturn = true },
+                        modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp),
+                    ) { Text(tr("إرجاع بضاعة")) }
+                }
+            }
+            item {
+                Row(Modifier.horizontalScroll(rememberScrollState())) {
+                    TextButton(onClick = { showEdit = true }) { Text(tr("تعديل")) }
+                    // دين كان على المحل لهذا المورد قبل استعمال التطبيق
+                    TextButton(onClick = { showOldDebt = true }) { Text(tr("دين سابق")) }
                 }
             }
             item { Text(tr("السجل"), style = MaterialTheme.typography.titleMedium) }
             if (ops.isEmpty()) item { Text(tr("لا توجد عمليات")) }
             items(ops, key = { it.id }) { op ->
-                val isPay = op.type == OpType.SUPPLIER_PAYMENT
+                // الدفع والإرجاع ينقصان ما على المحل، والشراء بالدَّين والدين السابق يزيدانه
+                val isPay = op.type == OpType.SUPPLIER_PAYMENT || op.type == OpType.SUPPLIER_RETURN
                 Card(Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(if (isPay) tr("دفع للمورد") else tr("شراء بالدَّين"), fontWeight = FontWeight.SemiBold)
+                            Text(
+                                when (op.type) {
+                                    OpType.SUPPLIER_PAYMENT -> tr("دفع للمورد")
+                                    OpType.SUPPLIER_RETURN -> tr("إرجاع للمورد")
+                                    OpType.OLD_DEBT -> tr("دين سابق") + if (op.note.isNotBlank()) " — ${op.note}" else ""
+                                    else -> tr("شراء بالدَّين")
+                                },
+                                fontWeight = FontWeight.SemiBold,
+                            )
                             Text(Dates.format(op.time), style = MaterialTheme.typography.bodySmall)
                         }
                         Text(
@@ -231,6 +260,29 @@ fun SupplierDetailScreen(dao: ShopDao, shopId: Long, supplierId: Long, onBack: (
         )
     }
 
+    if (showOldDebt) {
+        OldDebtDialog(
+            title = tr("دين سابق لمورد"),
+            hint = tr("مبلغ كان على المحل لهذا المورد قبل أن تبدأ استعمال التطبيق. يُضاف إلى ما عليك ولا يمس الصندوق ولا المخزون."),
+            onDismiss = { showOldDebt = false },
+            onSave = { amount, note ->
+                showOldDebt = false
+                scope.launch {
+                    dao.insertOldDebt(
+                        Operation(shopId = shopId, type = OpType.OLD_DEBT, total = amount, note = note, time = TrustedClock.now(), supplierId = supplierId)
+                    )
+                    snackbar.showSnackbar(tr("تم التسجيل"))
+                }
+            },
+        )
+    }
+    if (showReturn) {
+        SupplierReturnDialog(dao, shopId, supplierId, debt, onDismiss = { showReturn = false }, onDone = {
+            showReturn = false
+            scope.launch { snackbar.showSnackbar(tr("تم التسجيل")) }
+        })
+    }
+
     val s = supplier
     if (showEdit && s != null) {
         CustomerFormDialog(
@@ -243,6 +295,79 @@ fun SupplierDetailScreen(dao: ShopDao, shopId: Long, supplierId: Long, onBack: (
             },
         )
     }
+}
+
+/** إرجاع بضاعة إلى المورد: يختار التاجر المنتجات والكميات، وتُخصم قيمتها بسعر الشراء مما عليه للمورد */
+@Composable
+private fun SupplierReturnDialog(
+    dao: ShopDao, shopId: Long, supplierId: Long, debt: Long, onDismiss: () -> Unit, onDone: () -> Unit,
+) {
+    val products by dao.products(shopId).collectAsState(initial = emptyList())
+    val texts = remember { mutableStateMapOf<Long, String>() }
+    var query by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val byId = products.associateBy { it.id }
+    val wanted = texts.mapNotNull { (id, t) ->
+        val p = byId[id] ?: return@mapNotNull null
+        if (t.isBlank()) null else id to (Qty.parse(t, p.unit) ?: -1L)
+    }.toMap()
+    val bad = wanted.any { (id, q) -> q <= 0 || q > (byId[id]?.qty ?: 0L) }
+    val value = wanted.entries.sumOf { (id, q) -> if (q > 0) Qty.amount(byId[id]?.buyPrice ?: 0L, q) else 0L }
+    val shown = products.filter { it.qty > 0 && (query.isBlank() || it.name.contains(query.trim(), ignoreCase = true)) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr("إرجاع بضاعة للمورد")) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(tr("تُخصم قيمتها بسعر الشراء مما على المحل لهذا المورد (%1\$s).", Money.format(debt)), style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(
+                    value = query, onValueChange = { query = it }, singleLine = true,
+                    label = { Text(tr("بحث بالاسم")) }, modifier = Modifier.fillMaxWidth(),
+                )
+                LazyColumn(Modifier.fillMaxWidth().heightIn(max = 280.dp)) {
+                    items(shown, key = { it.id }) { p ->
+                        Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(p.name)
+                                Text(tr("الموجود: %1\$s", Qty.format(p.qty, p.unit)), style = MaterialTheme.typography.bodySmall)
+                            }
+                            OutlinedTextField(
+                                value = texts[p.id] ?: "", onValueChange = { texts[p.id] = it }, singleLine = true,
+                                label = { Text(tr("الكمية")) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.width(96.dp),
+                            )
+                        }
+                    }
+                }
+                if (bad) ErrorText(tr("كمية غير صحيحة أو أكبر من الموجود"))
+                if (value > 0) {
+                    Text(tr("القيمة: %1\$s", Money.format(value)), fontWeight = FontWeight.Bold)
+                    if (value > debt) ErrorText(tr("قيمة البضاعة المرجعة أكبر مما على المحل لهذا المورد"))
+                }
+                error?.let { ErrorText(it) }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !bad && value > 0 && value <= debt && !busy, onClick = {
+                busy = true
+                scope.launch {
+                    try {
+                        dao.recordSupplierReturn(shopId, supplierId, wanted, TrustedClock.now())
+                        onDone()
+                    } catch (e: IllegalStateException) {
+                        error = e.message
+                    } finally {
+                        busy = false
+                    }
+                }
+            }) { Text(tr("تأكيد الإرجاع")) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("إلغاء")) } },
+    )
 }
 
 /** اختيار المورد عند الشراء بالدَّين (أو إضافة مورد جديد مباشرة) */

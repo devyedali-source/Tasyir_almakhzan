@@ -126,7 +126,7 @@ fun SaleScreen(
     val total = gross - appliedDiscount
 
     /** customerId = null: بيع نقدي؛ غير ذلك: بيع بالدَّين على هذا الزبون */
-    fun confirmSale(customerId: Long?) {
+    fun confirmSale(customerId: Long?, paidNow: Long = 0L) {
         busy = true
         val saleTotal = total
         val disc = appliedDiscount
@@ -139,14 +139,15 @@ fun SaleScreen(
         }
         scope.launch {
             try {
-                val opId = dao.recordSale(shopId, items, TrustedClock.now(), customerId, workerId, disc)
+                val opId = if (customerId == null) dao.recordSale(shopId, items, TrustedClock.now(), null, workerId, disc)
+                else dao.recordCreditSale(shopId, items, TrustedClock.now(), customerId, workerId, disc, paidNow)
                 cart.clear()
                 discount = 0L
                 busy = false
                 snackbar.currentSnackbarData?.dismiss()
                 val r = snackbar.showSnackbar(
                     message = if (customerId == null) tr("تم تسجيل البيع: %1\$s", Money.format(saleTotal))
-                    else tr("تم تسجيل البيع بالدَّين: %1\$s", Money.format(saleTotal)),
+                    else tr("تم تسجيل البيع بالدَّين: %1\$s", Money.format(saleTotal - paidNow.coerceAtMost(saleTotal))),
                     actionLabel = tr("الفاتورة"),
                     duration = SnackbarDuration.Long,
                 )
@@ -388,7 +389,7 @@ fun SaleScreen(
         CustomerPickerDialog(
             dao, shopId, total,
             onDismiss = { showCreditPicker = false },
-            onPick = { id -> showCreditPicker = false; confirmSale(id) },
+            onPick = { id, paid -> showCreditPicker = false; confirmSale(id, paid) },
         )
     }
 

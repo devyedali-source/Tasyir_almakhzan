@@ -57,6 +57,14 @@ object OpType {
     const val SUPPLIER_PAYMENT = "SUPPLIER_PAYMENT"
     /** المخزون الموجود عند بدء استعمال التطبيق: يدخل المخزون بتكلفته دون أن يمسّ الصندوق */
     const val OPENING = "OPENING"
+    /** إيداع مال في الصندوق (رصيد افتتاحي أو رأس مال يضعه صاحب المحل) — لا يُحسب ربحًا */
+    const val DEPOSIT = "DEPOSIT"
+    /** سحب صاحب المحل مالًا من الصندوق لنفسه — ليس مصروفًا ولا يُنقص الربح */
+    const val WITHDRAW = "WITHDRAW"
+    /** دين سابق كان قبل استعمال التطبيق: على زبون (customerId) أو للمورد على المحل (supplierId) */
+    const val OLD_DEBT = "OLD_DEBT"
+    /** إرجاع بضاعة إلى مورد: ينقص المخزون وينقص ما على المحل للمورد */
+    const val SUPPLIER_RETURN = "SUPPLIER_RETURN"
 
     fun label(type: String) = when (type) {
         SALE -> tr("بيع")
@@ -67,6 +75,10 @@ object OpType {
         ADJUST -> tr("تسوية مخزون")
         SUPPLIER_PAYMENT -> tr("دفع لمورد")
         OPENING -> tr("مخزون افتتاحي")
+        DEPOSIT -> tr("إيداع في الصندوق")
+        WITHDRAW -> tr("سحب من الصندوق")
+        OLD_DEBT -> tr("دين سابق")
+        SUPPLIER_RETURN -> tr("إرجاع للمورد")
         else -> type
     }
 }
@@ -77,8 +89,8 @@ const val CASH_CASE =
         "WHEN type = 'SALE' AND customerId IS NOT NULL THEN 0 " +
         "WHEN type = 'RETURN' AND customerId IS NOT NULL THEN 0 " +
         "WHEN type = 'PURCHASE' AND supplierId IS NOT NULL THEN 0 " +
-        "WHEN type IN ('ADJUST', 'OPENING') THEN 0 " +
-        "WHEN type IN ('SALE', 'PAYMENT') THEN total " +
+        "WHEN type IN ('ADJUST', 'OPENING', 'OLD_DEBT', 'SUPPLIER_RETURN') THEN 0 " +
+        "WHEN type IN ('SALE', 'PAYMENT', 'DEPOSIT') THEN total " +
         "ELSE -total END"
 
 /**
@@ -118,9 +130,10 @@ val Operation.isCreditPurchase: Boolean get() = type == OpType.PURCHASE && suppl
 /** أثر العملية على الصندوق */
 val Operation.cashEffect: Long
     get() = when {
-        isCredit || isCreditPurchase || type == OpType.ADJUST || type == OpType.OPENING -> 0L
+        isCredit || isCreditPurchase -> 0L
+        type in setOf(OpType.ADJUST, OpType.OPENING, OpType.OLD_DEBT, OpType.SUPPLIER_RETURN) -> 0L
         type == OpType.RETURN && customerId != null -> 0L
-        type == OpType.SALE || type == OpType.PAYMENT -> total
+        type == OpType.SALE || type == OpType.PAYMENT || type == OpType.DEPOSIT -> total
         else -> -total
     }
 
@@ -130,6 +143,8 @@ fun Operation.title(): String = when {
     isCreditPurchase -> tr("شراء بالدَّين")
     type == OpType.PAYMENT && total < 0 -> tr("ردّ مال لزبون")
     type == OpType.RETURN && customerId != null -> tr("مرتجع من دَين")
+    type == OpType.OLD_DEBT && supplierId != null -> tr("دين سابق لمورد")
+    type == OpType.OLD_DEBT -> tr("دين سابق على زبون")
     else -> OpType.label(type)
 }
 

@@ -183,6 +183,10 @@ fun ShopHomeScreen(dao: ShopDao, shopId: Long, onBack: () -> Unit, go: (Route) -
                             style = MaterialTheme.typography.bodySmall,
                         )
                         Text(tr("إدخال المخزون الموجود"), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        // المال الموجود في الصندوق عند البدء
+                        TextButton(onClick = { go(Route.Cash(shopId)) }) {
+                            Text(tr("وضع المال الموجود في الصندوق (رصيد افتتاحي)"))
+                        }
                     }
                 }
             }

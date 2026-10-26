@@ -451,6 +451,8 @@ private fun WorkerHomeScreen(dao: ShopDao, shopId: Long, worker: Worker, onSell:
     val sales by dao.workerSaleCount(worker.id, start).collectAsState(initial = 0)
     val cash by dao.workerCashSales(worker.id, start).collectAsState(initial = 0L)
     val credit by dao.workerCreditSales(worker.id, start).collectAsState(initial = 0L)
+    // ما يُسلَّم = البيع النقدي + ما قبضه من ديون الزبائن (ومنه الدفعات الفورية عند البيع بالدَّين)
+    val collected by dao.workerPayments(worker.id, start).collectAsState(initial = 0L)
     var confirmEnd by remember { mutableStateOf(false) }
     val locked = shop?.let { Plans.isLocked(it, count, TrustedClock.now()) } == true
 
@@ -468,7 +470,7 @@ private fun WorkerHomeScreen(dao: ShopDao, shopId: Long, worker: Worker, onSell:
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(tr("ورديتي"), fontWeight = FontWeight.SemiBold)
                     Text(tr("عدد المبيعات: %1\$s", sales))
-                    Text(tr("نقدًا (يُسلَّم لصاحب المحل): %1\$s", Money.format(cash)), fontWeight = FontWeight.Bold)
+                    Text(tr("نقدًا (يُسلَّم لصاحب المحل): %1\$s", Money.format(cash + collected)), fontWeight = FontWeight.Bold)
                     if (worker.canCredit) Text(tr("بالدَّين: %1\$s", Money.format(credit)))
                 }
             }
@@ -504,7 +506,7 @@ private fun WorkerHomeScreen(dao: ShopDao, shopId: Long, worker: Worker, onSell:
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(tr("عدد المبيعات: %1\$s", sales))
-                    Text(tr("نقدًا (يُسلَّم لصاحب المحل): %1\$s", Money.format(cash)), fontWeight = FontWeight.Bold)
+                    Text(tr("نقدًا (يُسلَّم لصاحب المحل): %1\$s", Money.format(cash + collected)), fontWeight = FontWeight.Bold)
                     if (worker.canCredit) Text(tr("بالدَّين: %1\$s", Money.format(credit)))
                 }
             },

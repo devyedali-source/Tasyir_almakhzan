@@ -226,7 +226,7 @@ fun AdminActivateScreen(req: ActivationRequest, onBack: () -> Unit) {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(tr("المحل: %1\$s", req.shopName), fontWeight = FontWeight.Bold)
-                        Text(tr("صاحب الحساب: %1\$s", req.ownerEmail))
+                        if (req.ownerName.isNotBlank()) Text(tr("صاحب المحل: %1\$s", req.ownerName))
                         Text(tr("الباقة المطلوبة: %1\$s", tr(plan?.label ?: "")))
                         Text(tr("المبلغ: %1\$s أوقية لمدة %2\$s أشهر", plan?.price ?: 0, Activation.MONTHS), fontWeight = FontWeight.SemiBold)
                         if (loading) CircularProgressIndicator()

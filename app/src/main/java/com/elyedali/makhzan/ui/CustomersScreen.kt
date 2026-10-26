@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -54,6 +56,7 @@ import com.elyedali.makhzan.data.Customer
 import com.elyedali.makhzan.data.Dates
 import com.elyedali.makhzan.data.Money
 import com.elyedali.makhzan.data.OpType
+import com.elyedali.makhzan.data.Operation
 import com.elyedali.makhzan.data.ShopDao
 import com.elyedali.makhzan.data.TrustedClock
 import com.elyedali.makhzan.i18n.tr
@@ -165,6 +168,7 @@ fun CustomerDetailScreen(
     val ops by dao.customerOperations(customerId).collectAsState(initial = emptyList())
     var showPay by remember { mutableStateOf(false) }
     var showEdit by remember { mutableStateOf(false) }
+    var showOldDebt by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -221,7 +225,7 @@ fun CustomerDetailScreen(
                 }
             }
             item {
-                Row {
+                Row(Modifier.horizontalScroll(rememberScrollState())) {
                     TextButton(onClick = {
                         scope.launch {
                             val c = dao.customerNow(customerId) ?: return@launch
@@ -233,14 +237,16 @@ fun CustomerDetailScreen(
                             onPdf(f.absolutePath, tr("كشف حساب: %1\$s", c.name))
                         }
                     }) { Text(tr("كشف حساب PDF")) }
-                    TextButton(onClick = { showEdit = true }) { Text(tr("تعديل الاسم والهاتف")) }
+                    TextButton(onClick = { showEdit = true }) { Text(tr("تعديل")) }
+                    // دين كان على الزبون قبل استعمال التطبيق
+                    TextButton(onClick = { showOldDebt = true }) { Text(tr("دين سابق")) }
                 }
             }
             item { Text(tr("السجل"), style = MaterialTheme.typography.titleMedium) }
             if (ops.isEmpty()) item { Text(tr("لا توجد عمليات")) }
             items(ops, key = { it.id }) { op ->
                 // أثر العملية على دين الزبون: البيع يزيده، والتسديد والمرتجع ينقصانه، وردّ المال يعيده إلى الصفر
-                val effect = if (op.type == OpType.SALE) op.total else -op.total
+                val effect = if (op.type == OpType.SALE || op.type == OpType.OLD_DEBT) op.total else -op.total
                 Card(
                     onClick = { if (op.type == OpType.SALE) onInvoice(op.id) },
                     modifier = Modifier.fillMaxWidth(),
@@ -250,6 +256,7 @@ fun CustomerDetailScreen(
                             Text(
                                 when (op.type) {
                                     OpType.SALE -> tr("شراء بالدَّين")
+                                    OpType.OLD_DEBT -> tr("دين سابق") + if (op.note.isNotBlank()) " — ${op.note}" else ""
                                     OpType.PAYMENT -> if (op.total < 0) tr("ردّ مال لزبون") else tr("تسديد")
                                     else -> tr("مرتجع")
                                 },
@@ -297,6 +304,23 @@ fun CustomerDetailScreen(
         )
     }
 
+    if (showOldDebt) {
+        OldDebtDialog(
+            title = tr("دين سابق على الزبون"),
+            hint = tr("مبلغ كان على هذا الزبون قبل أن تبدأ استعمال التطبيق. يُضاف إلى دينه ولا يمس الصندوق ولا المبيعات."),
+            onDismiss = { showOldDebt = false },
+            onSave = { amount, note ->
+                showOldDebt = false
+                scope.launch {
+                    dao.insertOldDebt(
+                        Operation(shopId = shopId, type = OpType.OLD_DEBT, total = amount, note = note, time = TrustedClock.now(), customerId = customerId)
+                    )
+                    snackbar.showSnackbar(tr("تم التسجيل"))
+                }
+            },
+        )
+    }
+
     val c = customer
     if (showEdit && c != null) {
         CustomerFormDialog(
@@ -309,6 +333,32 @@ fun CustomerDetailScreen(
             },
         )
     }
+}
+
+/** إدخال دين سابق (على زبون أو لمورد) */
+@Composable
+fun OldDebtDialog(title: String, hint: String, onDismiss: () -> Unit, onSave: (amount: Long, note: String) -> Unit) {
+    var amount by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
+    val v = Money.parse(amount)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(hint, style = MaterialTheme.typography.bodySmall)
+                MoneyField(amount, { amount = it }, tr("المبلغ"))
+                OutlinedTextField(
+                    value = note, onValueChange = { note = it }, singleLine = true,
+                    label = { Text(tr("ملاحظة (اختياري)")) }, modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = v != null && v > 0, onClick = { onSave(v!!, note.trim()) }) { Text(tr("حفظ")) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(tr("إلغاء")) } },
+    )
 }
 
 @Composable
@@ -347,8 +397,12 @@ fun CustomerFormDialog(
 
 /** اختيار الزبون عند البيع بالدَّين (أو إضافة زبون جديد مباشرة) */
 @Composable
-fun CustomerPickerDialog(dao: ShopDao, shopId: Long, total: Long, onDismiss: () -> Unit, onPick: (Long) -> Unit) {
+fun CustomerPickerDialog(dao: ShopDao, shopId: Long, total: Long, onDismiss: () -> Unit, onPick: (customerId: Long, paidNow: Long) -> Unit) {
     val customers by dao.customersWithDebt(shopId).collectAsState(initial = emptyList())
+    // يدفع الزبون جزءًا الآن والباقي دين (اختياري)
+    var paidText by remember { mutableStateOf("") }
+    val paid = if (paidText.isBlank()) 0L else Money.parse(paidText)
+    val paidOk = paid != null && paid < total
     var query by remember { mutableStateOf("") }
     var showAdd by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -359,6 +413,12 @@ fun CustomerPickerDialog(dao: ShopDao, shopId: Long, total: Long, onDismiss: () 
         title = { Text(tr("بيع بالدَّين: %1\$s", Money.format(total))) },
         text = {
             Column {
+                MoneyField(paidText, { paidText = it }, tr("المدفوع الآن (اختياري)"))
+                when {
+                    paid == null -> ErrorText(tr("مبلغ غير صحيح"))
+                    !paidOk -> ErrorText(tr("المبلغ كله مدفوع: سجّله بيعًا نقديًا"))
+                    paid > 0 -> Text(tr("الباقي دينًا: %1\$s", Money.format(total - paid)), style = MaterialTheme.typography.bodySmall)
+                }
                 OutlinedTextField(
                     value = query, onValueChange = { query = it }, singleLine = true,
                     label = { Text(tr("ابحث عن الزبون")) }, modifier = Modifier.fillMaxWidth(),
@@ -372,7 +432,7 @@ fun CustomerPickerDialog(dao: ShopDao, shopId: Long, total: Long, onDismiss: () 
                 LazyColumn(Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
                     items(shown, key = { it.customer.id }) { cd ->
                         Row(
-                            Modifier.fillMaxWidth().clickable { onPick(cd.customer.id) }.padding(vertical = 10.dp),
+                            Modifier.fillMaxWidth().clickable(enabled = paidOk) { onPick(cd.customer.id, paid ?: 0L) }.padding(vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(cd.customer.name, modifier = Modifier.weight(1f))
@@ -394,7 +454,7 @@ fun CustomerPickerDialog(dao: ShopDao, shopId: Long, total: Long, onDismiss: () 
                 showAdd = false
                 scope.launch {
                     val id = dao.insertCustomer(Customer(shopId = shopId, name = name, phone = phone, createdAt = TrustedClock.now()))
-                    onPick(id)
+                    if (paidOk) onPick(id, paid ?: 0L)
                 }
             },
         )

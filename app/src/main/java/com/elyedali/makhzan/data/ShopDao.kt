@@ -258,6 +258,10 @@ abstract class ShopDao {
     @Query("SELECT COALESCE(SUM(total), 0) FROM operations WHERE workerId = :workerId AND type = 'SALE' AND customerId IS NOT NULL AND time >= :from")
     abstract fun workerCreditSales(workerId: Long, from: Long): Flow<Long>
 
+    /** ما قبضه العامل من ديون الزبائن خلال ورديته (يُسلَّم مع النقد) */
+    @Query("SELECT COALESCE(SUM(total), 0) FROM operations WHERE workerId = :workerId AND type = 'PAYMENT' AND time >= :from")
+    abstract fun workerPayments(workerId: Long, from: Long): Flow<Long>
+
     @Query(
         "SELECT workerId, COUNT(*) AS count, SUM(total) AS amount FROM operations " +
             "WHERE shopId = :shopId AND type = 'SALE' AND time >= :from AND time < :to GROUP BY workerId ORDER BY amount DESC"
@@ -270,7 +274,7 @@ abstract class ShopDao {
 
     @Query(
         "SELECT c.*, " +
-            "COALESCE((SELECT SUM(o.total) FROM operations o WHERE o.customerId = c.id AND o.type = 'SALE'), 0) - " +
+            "COALESCE((SELECT SUM(o.total) FROM operations o WHERE o.customerId = c.id AND o.type IN ('SALE', 'OLD_DEBT')), 0) - " +
             "COALESCE((SELECT SUM(o.total) FROM operations o WHERE o.customerId = c.id AND o.type IN ('PAYMENT', 'RETURN')), 0) AS debt " +
             "FROM customers c WHERE c.shopId = :shopId ORDER BY debt DESC, c.name"
     )
@@ -283,19 +287,19 @@ abstract class ShopDao {
     abstract suspend fun customerNow(id: Long): Customer?
 
     @Query(
-        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE customerId = :customerId AND type = 'SALE'), 0) - " +
+        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE customerId = :customerId AND type IN ('SALE', 'OLD_DEBT')), 0) - " +
             "COALESCE((SELECT SUM(total) FROM operations WHERE customerId = :customerId AND type IN ('PAYMENT', 'RETURN')), 0)"
     )
     abstract fun customerDebt(customerId: Long): Flow<Long>
 
     @Query(
-        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE customerId = :customerId AND type = 'SALE'), 0) - " +
+        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE customerId = :customerId AND type IN ('SALE', 'OLD_DEBT')), 0) - " +
             "COALESCE((SELECT SUM(total) FROM operations WHERE customerId = :customerId AND type IN ('PAYMENT', 'RETURN')), 0)"
     )
     abstract suspend fun customerDebtNow(customerId: Long): Long
 
     @Query(
-        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE shopId = :shopId AND customerId IS NOT NULL AND type = 'SALE'), 0) - " +
+        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE shopId = :shopId AND customerId IS NOT NULL AND type IN ('SALE', 'OLD_DEBT')), 0) - " +
             "COALESCE((SELECT SUM(total) FROM operations WHERE shopId = :shopId AND customerId IS NOT NULL AND type IN ('PAYMENT', 'RETURN')), 0)"
     )
     abstract fun totalDebt(shopId: Long): Flow<Long>
@@ -308,13 +312,66 @@ abstract class ShopDao {
 
     /** تسديد زبون: لا يُقبل مبلغ أكبر من دينه */
     @Transaction
-    open suspend fun recordPayment(shopId: Long, customerId: Long, amount: Long, time: Long): Long {
+    open suspend fun recordPayment(shopId: Long, customerId: Long, amount: Long, time: Long, workerId: Long? = null): Long {
         require(amount > 0)
         val debt = customerDebtNow(customerId)
         if (amount > debt) throw IllegalStateException(tr("المبلغ أكبر من الدَّين المتبقي"))
         return insertOperation(
-            Operation(shopId = shopId, type = OpType.PAYMENT, total = amount, note = "", time = time, customerId = customerId)
+            Operation(shopId = shopId, type = OpType.PAYMENT, total = amount, note = "", time = time, customerId = customerId, workerId = workerId)
         )
+    }
+
+    /** بيع بالدَّين مع دفعة فورية (يدفع الزبون جزءًا والباقي دين) في معاملة واحدة */
+    @Transaction
+    open suspend fun recordCreditSale(
+        shopId: Long, items: List<SaleItem>, time: Long, customerId: Long, workerId: Long?, discount: Long, paidNow: Long,
+    ): Long {
+        val id = recordSale(shopId, items, time, customerId, workerId, discount)
+        if (paidNow > 0) {
+            val total = operationNow(id)?.total ?: 0L
+            val pay = recordPayment(shopId, customerId, minOf(paidNow, total), time, workerId)
+            setRefId(pay, id) // يُربط بالبيع ليظهر في فاتورته
+        }
+        return id
+    }
+
+    /** دين سابق (قبل استعمال التطبيق) على زبون أو لمورد: لا يمس الصندوق ولا المخزون ولا الأرباح */
+    @Insert
+    abstract suspend fun insertOldDebt(op: Operation): Long
+
+    /**
+     * إرجاع بضاعة إلى مورد: تنقص الكمية بتكلفتها الحالية، وتنقص قيمتها مما على المحل للمورد.
+     * لا يُقبل إذا كانت القيمة أكبر مما على المحل له (البضاعة المدفوعة نقدًا تُسجَّل تالفًا أو يُلغى شراؤها).
+     * items: productId → الكمية (بالألف).
+     */
+    @Transaction
+    open suspend fun recordSupplierReturn(shopId: Long, supplierId: Long, items: Map<Long, Long>, time: Long): Long {
+        val wanted = items.filterValues { it > 0 }
+        if (wanted.isEmpty()) throw IllegalStateException(tr("اختر كمية لإرجاعها"))
+        val prods = wanted.keys.associateWith { productNow(it) ?: throw IllegalStateException(tr("منتج غير موجود: %1\$s", it)) }
+        for ((pid, q) in wanted) {
+            val p = prods.getValue(pid)
+            if (p.qty < q) throw IllegalStateException(tr("الكمية المتوفرة من «%1\$s» هي %2\$s فقط", p.name, Qty.format(p.qty, p.unit)))
+        }
+        val total = wanted.entries.sumOf { (pid, q) -> Qty.amount(prods.getValue(pid).buyPrice, q) }
+        if (total > supplierDebtNow(supplierId)) {
+            throw IllegalStateException(tr("قيمة البضاعة المرجعة أكبر مما على المحل لهذا المورد"))
+        }
+        val opId = insertOperation(
+            Operation(shopId = shopId, type = OpType.SUPPLIER_RETURN, total = total, note = "", time = time, supplierId = supplierId)
+        )
+        for ((pid, q) in wanted) {
+            val p = prods.getValue(pid)
+            val v = Qty.amount(p.buyPrice, q)
+            insertLine(
+                OperationLine(
+                    opId = opId, productId = pid, productName = p.name, barcode = p.barcode, qty = q,
+                    unitPrice = p.buyPrice, unitCost = p.buyPrice, amount = v, costAmount = v,
+                )
+            )
+            addQty(pid, -q)
+        }
+        return opId
     }
 
     @Query("SELECT COALESCE(SUM(total), 0) FROM operations WHERE shopId = :shopId AND type = :type AND time >= :from")
@@ -356,28 +413,28 @@ abstract class ShopDao {
 
     @Query(
         "SELECT s.*, " +
-            "COALESCE((SELECT SUM(o.total) FROM operations o WHERE o.supplierId = s.id AND o.type = 'PURCHASE'), 0) - " +
-            "COALESCE((SELECT SUM(o.total) FROM operations o WHERE o.supplierId = s.id AND o.type = 'SUPPLIER_PAYMENT'), 0) AS debt " +
+            "COALESCE((SELECT SUM(o.total) FROM operations o WHERE o.supplierId = s.id AND o.type IN ('PURCHASE', 'OLD_DEBT')), 0) - " +
+            "COALESCE((SELECT SUM(o.total) FROM operations o WHERE o.supplierId = s.id AND o.type IN ('SUPPLIER_PAYMENT', 'SUPPLIER_RETURN')), 0) AS debt " +
             "FROM suppliers s WHERE s.shopId = :shopId ORDER BY debt DESC, s.name"
     )
     abstract fun suppliersWithDebt(shopId: Long): Flow<List<SupplierDebt>>
 
     @Query(
-        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE supplierId = :supplierId AND type = 'PURCHASE'), 0) - " +
-            "COALESCE((SELECT SUM(total) FROM operations WHERE supplierId = :supplierId AND type = 'SUPPLIER_PAYMENT'), 0)"
+        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE supplierId = :supplierId AND type IN ('PURCHASE', 'OLD_DEBT')), 0) - " +
+            "COALESCE((SELECT SUM(total) FROM operations WHERE supplierId = :supplierId AND type IN ('SUPPLIER_PAYMENT', 'SUPPLIER_RETURN')), 0)"
     )
     abstract fun supplierDebt(supplierId: Long): Flow<Long>
 
     @Query(
-        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE supplierId = :supplierId AND type = 'PURCHASE'), 0) - " +
-            "COALESCE((SELECT SUM(total) FROM operations WHERE supplierId = :supplierId AND type = 'SUPPLIER_PAYMENT'), 0)"
+        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE supplierId = :supplierId AND type IN ('PURCHASE', 'OLD_DEBT')), 0) - " +
+            "COALESCE((SELECT SUM(total) FROM operations WHERE supplierId = :supplierId AND type IN ('SUPPLIER_PAYMENT', 'SUPPLIER_RETURN')), 0)"
     )
     abstract suspend fun supplierDebtNow(supplierId: Long): Long
 
     /** ما على المحل لكل الموردين */
     @Query(
-        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE shopId = :shopId AND supplierId IS NOT NULL AND type = 'PURCHASE'), 0) - " +
-            "COALESCE((SELECT SUM(total) FROM operations WHERE shopId = :shopId AND type = 'SUPPLIER_PAYMENT'), 0)"
+        "SELECT COALESCE((SELECT SUM(total) FROM operations WHERE shopId = :shopId AND supplierId IS NOT NULL AND type IN ('PURCHASE', 'OLD_DEBT')), 0) - " +
+            "COALESCE((SELECT SUM(total) FROM operations WHERE shopId = :shopId AND type IN ('SUPPLIER_PAYMENT', 'SUPPLIER_RETURN')), 0)"
     )
     abstract fun totalSupplierDebt(shopId: Long): Flow<Long>
 
@@ -406,6 +463,9 @@ abstract class ShopDao {
 
     @Query("SELECT * FROM operations WHERE refId = :opId AND type = 'PAYMENT' LIMIT 1")
     abstract suspend fun refundPaymentFor(opId: Long): Operation?
+
+    @Query("UPDATE operations SET refId = :refId WHERE id = :id")
+    abstract suspend fun setRefId(id: Long, refId: Long)
 
     // ---------- عمليات كاملة داخل معاملة واحدة ----------
 
@@ -625,12 +685,18 @@ abstract class ShopDao {
         if (op.type == OpType.SALE && returnCount(opId) > 0) {
             throw IllegalStateException(tr("ألغِ أولًا المرتجعات المرتبطة بهذا البيع"))
         }
-        if (op.type == OpType.PAYMENT && op.refId != null) {
+        if (op.type == OpType.PAYMENT && op.refId != null && operationNow(op.refId)?.type == OpType.RETURN) {
             throw IllegalStateException(tr("هذا المبلغ مرتبط بمرتجع: ألغِ المرتجع نفسه"))
         }
         // لا يُلغى بيع بالدَّين إذا كان ذلك سيجعل ما سدّده الزبون أكبر من دينه
         if (op.isCredit && op.customerId != null && customerDebtNow(op.customerId) < op.total) {
             throw IllegalStateException(tr("ألغِ أولًا تسديدات هذا الزبون، فقد سدّد جزءًا من هذا البيع"))
+        }
+        if (op.type == OpType.OLD_DEBT && op.customerId != null && customerDebtNow(op.customerId) < op.total) {
+            throw IllegalStateException(tr("ألغِ أولًا تسديدات هذا الزبون، فقد سدّد جزءًا من هذا الدين"))
+        }
+        if (op.type == OpType.OLD_DEBT && op.supplierId != null && supplierDebtNow(op.supplierId) < op.total) {
+            throw IllegalStateException(tr("ألغِ أولًا ما دفعته لهذا المورد، فقد دفعت جزءًا من هذا الدين"))
         }
         if (op.isCreditPurchase && op.supplierId != null && supplierDebtNow(op.supplierId) < op.total) {
             throw IllegalStateException(tr("ألغِ أولًا ما دفعته لهذا المورد، فقد دفعت جزءًا من هذا الشراء"))
@@ -655,6 +721,14 @@ abstract class ShopDao {
                     takeBack(l, tr("لا يمكن إلغاء هذا المرتجع: بيع جزء من «%1\$s» بعده", l.productName))
                 }
                 refundPaymentFor(opId)?.let { deleteOperation(it.id) }
+            }
+            OpType.SUPPLIER_RETURN -> {
+                // تعود البضاعة إلى المخزون بتكلفتها
+                for (l in opLines) {
+                    val p = productNow(l.productId) ?: continue
+                    setCost(p.id, if (p.qty <= 0) l.unitCost else Qty.weightedCost(p.buyPrice, p.qty, l.unitCost, l.qty))
+                    addQty(p.id, l.qty)
+                }
             }
             OpType.ADJUST -> {
                 for (l in opLines) {
